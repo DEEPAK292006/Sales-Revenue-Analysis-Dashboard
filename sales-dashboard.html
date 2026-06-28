@@ -1,0 +1,2608 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RevScope — Sales & Revenue Dashboard</title>
+<!-- External Libraries for Data Parsing & Charts -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0d0f14;
+    --surface: #13161e;
+    --card: #181c26;
+    --card-border: rgba(255,255,255,0.07);
+    --accent: #4f7ef8;
+    --accent-glow: rgba(79,126,248,0.18);
+    --accent2: #22d3a5;
+    --accent3: #f5a623;
+    --text: #f0f2f8;
+    --text-2: #8a92a8;
+    --text-3: #4a5068;
+    --sidebar-w: 220px;
+    --topbar-h: 60px;
+    --red: #f25f5c;
+    --green: #22d3a5;
+    --yellow: #f5a623;
+    --purple: #a78bfa;
+    --font: 'Inter', system-ui, sans-serif;
+    --mono: 'DM Mono', monospace;
+    --radius: 10px;
+    --radius-lg: 16px;
+  }
+
+  html { font-family: var(--font); background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.5; }
+  body { display: flex; min-height: 100vh; overflow-x: hidden; }
+
+  /* ── Sidebar ── */
+  .sidebar {
+    width: var(--sidebar-w);
+    background: var(--surface);
+    border-right: 1px solid var(--card-border);
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    top: 0; left: 0; bottom: 0;
+    z-index: 100;
+    transition: transform 0.25s;
+  }
+  .sidebar-logo {
+    height: var(--topbar-h);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 20px;
+    border-bottom: 1px solid var(--card-border);
+  }
+  .logo-icon {
+    width: 28px; height: 28px;
+    background: var(--accent);
+    border-radius: 7px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .logo-icon svg { width: 16px; height: 16px; fill: #fff; }
+  .logo-name { font-size: 15px; font-weight: 600; letter-spacing: -0.3px; color: var(--text); }
+  .logo-name span { color: var(--accent); }
+  .sidebar-nav { padding: 16px 10px; flex: 1; display: flex; flex-direction: column; gap: 2px; }
+  .nav-label { font-size: 10px; font-weight: 500; color: var(--text-3); letter-spacing: 0.08em; text-transform: uppercase; padding: 8px 10px 4px; }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    color: var(--text-2);
+    font-size: 13px;
+    font-weight: 400;
+    transition: all 0.12s;
+    text-decoration: none;
+  }
+  .nav-item:hover { background: rgba(255,255,255,0.05); color: var(--text); }
+  .nav-item.active { background: var(--accent-glow); color: var(--accent); font-weight: 500; }
+  .nav-item svg { width: 16px; height: 16px; flex-shrink: 0; }
+  .sidebar-bottom {
+    padding: 12px 10px;
+    border-top: 1px solid var(--card-border);
+  }
+  .user-pill {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  .user-pill:hover { background: rgba(255,255,255,0.05); }
+  .avatar {
+    width: 30px; height: 30px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), var(--purple));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 600; color: #fff; flex-shrink: 0;
+  }
+  .user-info { flex: 1; min-width: 0; }
+  .user-name { font-size: 12px; font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .user-role { font-size: 11px; color: var(--text-3); }
+
+  /* ── Topbar ── */
+  .topbar {
+    position: fixed;
+    top: 0; left: var(--sidebar-w); right: 0;
+    height: var(--topbar-h);
+    background: var(--surface);
+    border-bottom: 1px solid var(--card-border);
+    display: flex; align-items: center;
+    padding: 0 28px;
+    gap: 16px;
+    z-index: 90;
+  }
+  .topbar-title { font-size: 15px; font-weight: 500; color: var(--text); flex: 1; }
+  .topbar-title span { color: var(--text-3); font-weight: 400; }
+  .topbar-actions { display: flex; align-items: center; gap: 10px; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 7px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1px solid var(--card-border);
+    background: var(--card);
+    color: var(--text);
+    font-family: var(--font);
+    transition: all 0.12s;
+    text-decoration: none;
+  }
+  .btn:hover { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.14); }
+  .btn svg { width: 14px; height: 14px; }
+  .btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn-primary:hover { background: #6b8ef9; border-color: #6b8ef9; }
+
+  /* ── Main ── */
+  .main {
+    margin-left: var(--sidebar-w);
+    margin-top: var(--topbar-h);
+    padding: 28px;
+    flex: 1;
+    min-height: calc(100vh - var(--topbar-h));
+  }
+
+  /* ── Filter Bar ── */
+  .filters-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    align-items: center;
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    padding: 14px 20px;
+    border-radius: var(--radius);
+    margin-bottom: 24px;
+  }
+  .filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .filter-group label {
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--text-3);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .filter-select {
+    background: var(--surface);
+    border: 1px solid var(--card-border);
+    color: var(--text-2);
+    font-size: 12px;
+    padding: 6px 12px;
+    border-radius: 6px;
+    outline: none;
+    cursor: pointer;
+    font-family: var(--font);
+  }
+  .filter-select:focus {
+    border-color: var(--accent);
+    color: var(--text);
+  }
+
+  /* ── View Switch Pages ── */
+  .view-page {
+    display: none;
+    animation: fadeIn 0.2s ease-in-out forwards;
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── KPI strip ── */
+  .kpi-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; margin-bottom: 24px; }
+  .kpi-card {
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius-lg);
+    padding: 20px 20px 16px;
+    position: relative;
+    overflow: hidden;
+  }
+  .kpi-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+  }
+  .kpi-card.blue::before { background: var(--accent); }
+  .kpi-card.green::before { background: var(--green); }
+  .kpi-card.yellow::before { background: var(--yellow); }
+  .kpi-card.purple::before { background: var(--purple); }
+  .kpi-card.teal::before { background: #06b6d4; }
+  .kpi-icon {
+    width: 34px; height: 34px; border-radius: 9px;
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 14px;
+  }
+  .kpi-icon.blue { background: rgba(79,126,248,0.15); color: var(--accent); }
+  .kpi-icon.green { background: rgba(34,211,165,0.12); color: var(--green); }
+  .kpi-icon.yellow { background: rgba(245,166,35,0.12); color: var(--yellow); }
+  .kpi-icon.purple { background: rgba(167,139,250,0.12); color: var(--purple); }
+  .kpi-icon.teal { background: rgba(6,182,212,0.12); color: #06b6d4; }
+  .kpi-icon svg { width: 16px; height: 16px; }
+  .kpi-label { font-size: 11px; font-weight: 500; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+  .kpi-value { font-size: 26px; font-weight: 600; color: var(--text); letter-spacing: -0.5px; font-variant-numeric: tabular-nums; }
+  .kpi-delta { font-size: 11px; margin-top: 6px; display: flex; align-items: center; gap: 4px; }
+  .kpi-delta.up { color: var(--green); }
+  .kpi-delta.down { color: var(--red); }
+  .kpi-delta.neutral { color: var(--text-3); }
+
+  /* ── Charts row ── */
+  .charts-row { display: grid; grid-template-columns: 1fr 380px; gap: 16px; margin-bottom: 16px; }
+  .charts-row2 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius-lg);
+    padding: 22px 24px;
+    margin-bottom: 16px;
+  }
+  .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+  .card-title { font-size: 13px; font-weight: 500; color: var(--text); }
+  .card-sub { font-size: 11px; color: var(--text-3); margin-top: 2px; }
+  .chart-legend { display: flex; gap: 14px; flex-wrap: wrap; }
+  .legend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-2); }
+  .select-sm {
+    background: var(--surface);
+    border: 1px solid var(--card-border);
+    color: var(--text-2);
+    font-size: 11px;
+    font-family: var(--font);
+    border-radius: 6px;
+    padding: 4px 8px;
+    cursor: pointer;
+    outline: none;
+  }
+
+  /* ── Table ── */
+  .data-table { width: 100%; border-collapse: collapse; }
+  .data-table th {
+    text-align: left; font-size: 10px; font-weight: 500;
+    color: var(--text-3); text-transform: uppercase; letter-spacing: 0.07em;
+    padding: 0 0 12px; border-bottom: 1px solid var(--card-border);
+  }
+  .data-table td { padding: 13px 0; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 13px; color: var(--text); vertical-align: middle; }
+  .data-table tr:last-child td { border-bottom: none; }
+  .data-table tr:hover td { background: rgba(255,255,255,0.015); }
+  .product-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 8px; flex-shrink: 0; }
+  .rank-badge { width: 20px; height: 20px; border-radius: 5px; background: rgba(255,255,255,0.06); display: inline-flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 600; color: var(--text-3); font-family: var(--mono); }
+  .progress-bar-bg { height: 4px; background: rgba(255,255,255,0.06); border-radius: 2px; width: 80px; overflow: hidden; }
+  .progress-bar-fill { height: 100%; border-radius: 2px; transition: width 0.4s ease; }
+  .pill { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 20px; font-size: 11px; font-weight: 500; }
+  .pill.up { background: rgba(34,211,165,0.12); color: var(--green); }
+  .pill.down { background: rgba(242,95,92,0.12); color: var(--red); }
+
+  /* ── Activity feed ── */
+  .activity-list { display: flex; flex-direction: column; gap: 0; }
+  .activity-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
+  .activity-item:last-child { border-bottom: none; }
+  .activity-dot-wrap { display: flex; flex-direction: column; align-items: center; gap: 0; padding-top: 4px; }
+  .activity-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .activity-text { font-size: 12px; color: var(--text-2); line-height: 1.5; }
+  .activity-text strong { color: var(--text); font-weight: 500; }
+  .activity-time { font-size: 10px; color: var(--text-3); margin-top: 2px; font-family: var(--mono); }
+
+  /* ── Progress ring (Gauge) ── */
+  .gauge-wrap { display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 6px; }
+  .gauge-value { font-size: 22px; font-weight: 600; color: var(--text); letter-spacing: -0.5px; text-align: center; }
+  .gauge-label { font-size: 11px; color: var(--text-3); text-align: center; }
+
+  /* ── Region mini ── */
+  .region-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
+  .region-row:last-child { border-bottom: none; }
+  .region-name { font-size: 12px; color: var(--text-2); width: 60px; flex-shrink: 0; }
+  .region-bar-bg { flex: 1; height: 6px; background: rgba(255,255,255,0.06); border-radius: 3px; overflow: hidden; }
+  .region-bar-fill { height: 100%; border-radius: 3px; }
+  .region-pct { font-size: 11px; font-family: var(--mono); color: var(--text-3); width: 34px; text-align: right; flex-shrink: 0; }
+
+  /* ── Modal Overlay ── */
+  .modal-overlay {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(10, 12, 18, 0.85);
+    backdrop-filter: blur(8px);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 1000;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.2s ease;
+  }
+  .modal-overlay.open { opacity: 1; pointer-events: auto; }
+  .modal-card {
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius-lg);
+    width: 650px; max-width: 90%;
+    max-height: 85vh;
+    display: flex; flex-direction: column;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+    overflow: hidden;
+    transform: translateY(20px);
+    transition: transform 0.2s ease;
+  }
+  .modal-overlay.open .modal-card { transform: translateY(0); }
+  .modal-header {
+    padding: 18px 24px;
+    border-bottom: 1px solid var(--card-border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .modal-title { font-size: 14px; font-weight: 600; color: var(--text); }
+  .modal-close {
+    cursor: pointer; background: none; border: none; color: var(--text-3);
+    font-size: 20px; line-height: 1; transition: color 0.12s;
+  }
+  .modal-close:hover { color: var(--text); }
+  .modal-tabs {
+    display: flex; border-bottom: 1px solid var(--card-border); background: var(--surface);
+  }
+  .modal-tab {
+    flex: 1; padding: 12px; text-align: center; font-size: 12px; font-weight: 500;
+    color: var(--text-2); cursor: pointer; border-bottom: 2px solid transparent;
+    transition: all 0.15s;
+  }
+  .modal-tab.active {
+    color: var(--accent); border-bottom-color: var(--accent); background: rgba(79,126,248,0.03);
+  }
+  .modal-body { padding: 24px; overflow-y: auto; flex: 1; }
+  
+  /* Drag and Drop Zone */
+  .drag-drop-zone {
+    border: 2px dashed rgba(79,126,248,0.3);
+    background: rgba(79,126,248,0.02);
+    border-radius: var(--radius);
+    padding: 40px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .drag-drop-zone:hover, .drag-drop-zone.dragover {
+    border-color: var(--accent);
+    background: rgba(79,126,248,0.06);
+  }
+  .drag-drop-icon {
+    font-size: 32px; color: var(--accent); margin-bottom: 10px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .drag-drop-text { font-size: 13px; color: var(--text-2); }
+  .drag-drop-text strong { color: var(--accent); }
+
+  /* Grid of datasets */
+  .dataset-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .dataset-card {
+    background: var(--surface);
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius);
+    padding: 16px;
+    cursor: pointer;
+    transition: all 0.12s;
+  }
+  .dataset-card:hover {
+    border-color: var(--accent);
+    background: rgba(255,255,255,0.02);
+    transform: translateY(-2px);
+  }
+  .dataset-name { font-weight: 500; font-size: 13px; margin-bottom: 4px; }
+  .dataset-desc { font-size: 11px; color: var(--text-3); }
+
+  /* Database Connection Panel */
+  .db-form { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+  .form-group { display: flex; flex-direction: column; gap: 4px; }
+  .form-group.full { grid-column: 1 / -1; }
+  .form-group label { font-size: 11px; color: var(--text-3); font-weight: 500; text-transform: uppercase; }
+  .form-input {
+    background: var(--surface);
+    border: 1px solid var(--card-border);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 7px 12px;
+    font-size: 12px;
+    font-family: var(--font);
+    outline: none;
+  }
+  .form-input:focus { border-color: var(--accent); }
+
+  .db-terminal {
+    background: #090b0f;
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 8px;
+    padding: 14px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: #38bdf8;
+    min-height: 120px;
+    max-height: 200px;
+    overflow-y: auto;
+    margin-top: 12px;
+    line-height: 1.6;
+  }
+  .db-terminal .log-err { color: var(--red); }
+  .db-terminal .log-success { color: var(--green); }
+  .db-terminal .log-warning { color: var(--yellow); }
+
+  /* Column Mapping Styles */
+  .mapping-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
+  .mapping-label { font-size: 12px; color: var(--text-2); font-weight: 500; }
+
+  /* AI Chatbot Styles */
+  .insights-grid { display: grid; grid-template-columns: 1fr 360px; gap: 16px; }
+  .chat-container {
+    display: flex;
+    flex-direction: column;
+    height: 480px;
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+  }
+  .chat-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--card-border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--surface);
+  }
+  .chat-messages {
+    flex: 1;
+    padding: 16px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .chat-message {
+    max-width: 85%;
+    padding: 10px 14px;
+    border-radius: 12px;
+    font-size: 13px;
+    line-height: 1.5;
+    animation: popIn 0.2s ease-out;
+  }
+  @keyframes popIn {
+    from { opacity: 0; transform: scale(0.96) translateY(5px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+  }
+  .chat-message.ai {
+    align-self: flex-start;
+    background: var(--surface);
+    border: 1px solid var(--card-border);
+    color: var(--text);
+    border-top-left-radius: 2px;
+  }
+  .chat-message.user {
+    align-self: flex-end;
+    background: var(--accent);
+    color: #fff;
+    border-top-right-radius: 2px;
+  }
+  .chat-input-area {
+    padding: 12px 16px;
+    border-top: 1px solid var(--card-border);
+    display: flex;
+    gap: 10px;
+    background: var(--surface);
+  }
+  .chat-input {
+    flex: 1;
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    padding: 8px 14px;
+    color: var(--text);
+    outline: none;
+    font-size: 13px;
+    font-family: var(--font);
+  }
+  .chat-input:focus { border-color: var(--accent); }
+  .chat-suggestions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 8px 16px;
+    background: rgba(255,255,255,0.01);
+    border-top: 1px solid rgba(255,255,255,0.03);
+  }
+  .chat-suggest-btn {
+    background: var(--surface);
+    border: 1px solid var(--card-border);
+    color: var(--text-2);
+    font-size: 11px;
+    padding: 5px 10px;
+    border-radius: 14px;
+    cursor: pointer;
+    transition: all 0.12s;
+  }
+  .chat-suggest-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--accent-glow);
+  }
+
+  /* Integrations Grid */
+  .int-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
+  .int-card {
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    position: relative;
+  }
+  .int-card-header { display: flex; align-items: center; justify-content: space-between; }
+  .int-logo { width: 32px; height: 32px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 600; }
+  .int-badge { padding: 3px 8px; border-radius: 20px; font-size: 10px; font-weight: 500; }
+  .int-badge.connected { background: rgba(34,211,165,0.12); color: var(--green); }
+  .int-badge.idle { background: rgba(255,255,255,0.06); color: var(--text-2); }
+  .int-badge.configure { background: rgba(79,126,248,0.12); color: var(--accent); }
+
+  /* ── Toast ── */
+  .toast {
+    position: fixed; bottom: 24px; right: 24px;
+    background: #1e2336; border: 1px solid var(--card-border);
+    border-radius: 10px; padding: 12px 18px;
+    font-size: 12px; color: var(--text); display: flex; align-items: center; gap: 10px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    opacity: 0; transform: translateY(10px);
+    transition: all 0.2s; pointer-events: none; z-index: 9999;
+  }
+  .toast.show { opacity: 1; transform: translateY(0); }
+  .toast-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); }
+
+  /* ── Scrollbar ── */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 3px; }
+
+  /* ── Responsive ── */
+  @media (max-width: 1200px) {
+    .kpi-grid { grid-template-columns: repeat(3, 1fr); }
+    .charts-row { grid-template-columns: 1fr; }
+    .charts-row2 { grid-template-columns: 1fr 1fr; }
+    .insights-grid { grid-template-columns: 1fr; }
+    .int-grid { grid-template-columns: 1fr 1fr; }
+  }
+  @media (max-width: 860px) {
+    .sidebar { transform: translateX(-100%); }
+    .sidebar.open { transform: translateX(0); }
+    .main { margin-left: 0; }
+    .topbar { left: 0; }
+    .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+    .charts-row2 { grid-template-columns: 1fr; }
+    .main { padding: 16px; }
+    .int-grid { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 520px) {
+    .kpi-grid { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-icon">
+      <svg viewBox="0 0 16 16"><path d="M2 12h3v2H2zM6.5 7h3v7h-3zM11 3h3v11h-3z"/></svg>
+    </div>
+    <div class="logo-name">Rev<span>Scope</span></div>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="nav-label">Analytics</div>
+    <a class="nav-item active" id="nav-overview" onclick="switchView('view-overview', this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
+      Overview
+    </a>
+    <a class="nav-item" id="nav-revenue" onclick="switchView('view-revenue', this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      Revenue & Sales
+    </a>
+    <a class="nav-item" id="nav-customers" onclick="switchView('view-customers', this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      Customers
+    </a>
+    <div class="nav-label" style="margin-top:10px">Intelligence</div>
+    <a class="nav-item" id="nav-insights" onclick="switchView('view-insights', this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      Insights AI
+    </a>
+    <a class="nav-item" id="nav-integrations" onclick="switchView('view-integrations', this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
+      Integrations
+    </a>
+  </nav>
+  <div class="sidebar-bottom">
+    <div class="user-pill">
+      <div class="avatar">AG</div>
+      <div class="user-info">
+        <div class="user-name">Antigravity</div>
+        <div class="user-role">Administrator</div>
+      </div>
+    </div>
+  </div>
+</aside>
+
+<!-- Topbar -->
+<header class="topbar">
+  <button class="btn" id="menuBtn" onclick="document.getElementById('sidebar').classList.toggle('open')" style="display:none" aria-label="Open menu">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+  </button>
+  <div class="topbar-title">Overview <span>/ Sales & Revenue</span></div>
+  <div class="topbar-actions">
+    <button class="btn btn-primary" onclick="openImportModal()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      Import Data
+    </button>
+    <button class="btn" onclick="exportReport()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Export CSV
+    </button>
+  </div>
+</header>
+
+<!-- Main Workspace -->
+<main class="main">
+
+  <!-- Interactive Slicer / Filter Strip -->
+  <div class="filters-bar" id="globalFilters">
+    <div class="filter-group">
+      <label>Select Date Range</label>
+      <select id="filterDate" class="filter-select" onchange="onFilterChange()">
+        <option value="all">Full Range (Oct 1 - Dec 31, 2026)</option>
+        <option value="oct">October 2026</option>
+        <option value="nov">November 2026</option>
+        <option value="dec">December 2026</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Category Slicer</label>
+      <select id="filterCategory" class="filter-select" onchange="onFilterChange()">
+        <option value="all">All Categories</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Region Slicer</label>
+      <select id="filterRegion" class="filter-select" onchange="onFilterChange()">
+        <option value="all">All Regions</option>
+      </select>
+    </div>
+    <div class="filter-group" style="margin-left: auto;">
+      <button class="btn" style="padding: 5px 12px; font-size: 11px;" onclick="resetFilters()">Reset Filters</button>
+    </div>
+  </div>
+
+  <!-- VIEW 1: OVERVIEW -->
+  <div id="view-overview" class="view-page" style="display: block;">
+    <!-- KPI Cards -->
+    <div class="kpi-grid">
+      <div class="kpi-card blue">
+        <div class="kpi-icon blue">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        </div>
+        <div class="kpi-label">Total Revenue</div>
+        <div class="kpi-value" id="k-rev">$0</div>
+        <div class="kpi-delta" id="k-rev-d">↑ 0%</div>
+      </div>
+      <div class="kpi-card green">
+        <div class="kpi-icon green">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+        </div>
+        <div class="kpi-label">Total Sales</div>
+        <div class="kpi-value" id="k-sales">0</div>
+        <div class="kpi-delta" id="k-sales-d">↑ 0%</div>
+      </div>
+      <div class="kpi-card yellow">
+        <div class="kpi-icon yellow">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+        </div>
+        <div class="kpi-label">Avg Order Value</div>
+        <div class="kpi-value" id="k-aov">$0</div>
+        <div class="kpi-delta neutral" id="k-aov-d">per order</div>
+      </div>
+      <div class="kpi-card purple">
+        <div class="kpi-icon purple">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+        </div>
+        <div class="kpi-label">Gross Margin</div>
+        <div class="kpi-value" id="k-margin">0%</div>
+        <div class="kpi-delta" id="k-margin-d">↑ 0pp</div>
+      </div>
+      <div class="kpi-card teal">
+        <div class="kpi-icon teal">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        </div>
+        <div class="kpi-label">Unique Customers</div>
+        <div class="kpi-value" id="k-cust">0</div>
+        <div class="kpi-delta" id="k-cust-d">↑ 0%</div>
+      </div>
+    </div>
+
+    <!-- Revenue Trend + Target Attainment -->
+    <div class="charts-row">
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Revenue Trend</div>
+            <div class="card-sub">Dynamic revenue performance vs targets</div>
+          </div>
+          <div class="chart-legend">
+            <div class="legend-item"><div class="legend-dot" style="background:#4f7ef8"></div>Revenue</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#22d3a5"></div>Target</div>
+          </div>
+        </div>
+        <div style="position:relative;height:240px"><canvas id="trendChart"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Target Attainment</div>
+            <div class="card-sub">Overall target success rate</div>
+          </div>
+        </div>
+        <div class="gauge-wrap" style="margin:8px 0 18px">
+          <canvas id="gaugeChart" width="160" height="160"></canvas>
+          <div class="gauge-value" id="gaugeVal">0%</div>
+          <div class="gauge-label">of target reached</div>
+        </div>
+        <div id="gaugeList"></div>
+      </div>
+    </div>
+
+    <!-- Cat + Region + Activity -->
+    <div class="charts-row2">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">By Category</div>
+          <select class="select-sm" id="catType" onchange="updateCategoryChart()">
+            <option value="revenue">Revenue</option>
+            <option value="units">Units</option>
+          </select>
+        </div>
+        <div style="position:relative;height:200px"><canvas id="catChart"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">By Region</div>
+        </div>
+        <div style="position:relative;height:160px;margin-bottom:16px"><canvas id="regChart"></canvas></div>
+        <div id="regBars"></div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Recent Activity</div>
+          <div style="font-size:11px;color:var(--text-3)">Live Feed</div>
+        </div>
+        <div class="activity-list" id="activityList"></div>
+      </div>
+    </div>
+
+    <!-- Products Table -->
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">Top Products</div>
+          <div class="card-sub">Ranked by revenue for this filtered dataset</div>
+        </div>
+        <input type="text" placeholder="Search products…" oninput="filterTable(this.value)"
+          style="background:var(--surface);border:1px solid var(--card-border);color:var(--text);font-family:var(--font);font-size:12px;padding:6px 12px;border-radius:7px;outline:none;width:180px;">
+      </div>
+      <table class="data-table" id="prodTable">
+        <thead>
+          <tr>
+            <th style="width:28px">#</th>
+            <th>Product</th>
+            <th>Category</th>
+            <th>Units</th>
+            <th>Revenue</th>
+            <th>Margin</th>
+            <th>Share</th>
+            <th>vs Prior Half</th>
+          </tr>
+        </thead>
+        <tbody id="prodBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- VIEW 2: REVENUE & SALES DEEP DIVE -->
+  <div id="view-revenue" class="view-page">
+    <div class="kpi-grid">
+      <div class="kpi-card blue">
+        <div class="kpi-icon blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg></div>
+        <div class="kpi-label">Cumulative Revenue</div>
+        <div class="kpi-value" id="r-cum-rev">$0</div>
+        <div class="kpi-delta neutral">Total generated</div>
+      </div>
+      <div class="kpi-card purple">
+        <div class="kpi-icon purple"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="9" y1="9" x2="15" y2="15"/><line x1="15" y1="9" x2="9" y2="15"/></svg></div>
+        <div class="kpi-label">Total Profit Pool</div>
+        <div class="kpi-value" id="r-profit">$0</div>
+        <div class="kpi-delta neutral">Net gross earnings</div>
+      </div>
+      <div class="kpi-card green">
+        <div class="kpi-icon green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
+        <div class="kpi-label">Avg Transaction Size</div>
+        <div class="kpi-value" id="r-avg-tx">$0</div>
+        <div class="kpi-delta neutral">Value per line item</div>
+      </div>
+      <div class="kpi-card yellow">
+        <div class="kpi-icon yellow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
+        <div class="kpi-label">Top Category</div>
+        <div class="kpi-value" id="r-top-cat">-</div>
+        <div class="kpi-delta neutral" id="r-top-cat-share">0% share</div>
+      </div>
+      <div class="kpi-card teal">
+        <div class="kpi-icon teal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div>
+        <div class="kpi-label">Avg Margin %</div>
+        <div class="kpi-value" id="r-avg-margin">0%</div>
+        <div class="kpi-delta neutral">Weighted profitability</div>
+      </div>
+    </div>
+
+    <div class="charts-row">
+      <div class="card" style="grid-column: span 2;">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Cumulative Revenue Performance</div>
+            <div class="card-sub">Growth trajectory over the active timeframe</div>
+          </div>
+        </div>
+        <div style="position:relative;height:260px"><canvas id="cumRevChart"></canvas></div>
+      </div>
+    </div>
+
+    <div class="charts-row" style="grid-template-columns: 1fr 1fr;">
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Profit Margin by Product</div>
+            <div class="card-sub">Product margin comparison</div>
+          </div>
+        </div>
+        <div style="position:relative;height:240px"><canvas id="marginProductChart"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Product Margin % vs Units Sold</div>
+            <div class="card-sub">Analyzing stars vs low-margin high-volume items</div>
+          </div>
+        </div>
+        <div style="position:relative;height:240px"><canvas id="scatterChart"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- VIEW 3: CUSTOMERS -->
+  <div id="view-customers" class="view-page">
+    <div class="kpi-grid">
+      <div class="kpi-card blue">
+        <div class="kpi-icon blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg></div>
+        <div class="kpi-label">Active Customers</div>
+        <div class="kpi-value" id="c-total">0</div>
+        <div class="kpi-delta neutral">Unique buying entities</div>
+      </div>
+      <div class="kpi-card purple">
+        <div class="kpi-icon purple"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg></div>
+        <div class="kpi-label">VIP Customers</div>
+        <div class="kpi-value" id="c-vips">0</div>
+        <div class="kpi-delta neutral">Purchased &gt; $5,000</div>
+      </div>
+      <div class="kpi-card green">
+        <div class="kpi-icon green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
+        <div class="kpi-label">Customer LTV</div>
+        <div class="kpi-value" id="c-ltv">$0</div>
+        <div class="kpi-delta neutral">Average customer value</div>
+      </div>
+      <div class="kpi-card yellow">
+        <div class="kpi-icon yellow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 14 14"/></svg></div>
+        <div class="kpi-label">Order Frequency</div>
+        <div class="kpi-value" id="c-freq">0.0</div>
+        <div class="kpi-delta neutral">Avg orders per customer</div>
+      </div>
+      <div class="kpi-card teal">
+        <div class="kpi-icon teal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+        <div class="kpi-label">Cohort Retention</div>
+        <div class="kpi-value">84.2%</div>
+        <div class="kpi-delta neutral">Simulated industry average</div>
+      </div>
+    </div>
+
+    <div class="charts-row" style="grid-template-columns: 380px 1fr;">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Customer Segments</div>
+          <div class="card-sub">Distribution by purchase volume</div>
+        </div>
+        <div style="position:relative;height:240px;margin-bottom:12px"><canvas id="customerSegmentChart"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Customer Purchase Volume Distribution</div>
+            <div class="card-sub">Total sales generated by top 10 customers</div>
+          </div>
+        </div>
+        <div style="position:relative;height:240px"><canvas id="customerDistChart"></canvas></div>
+      </div>
+    </div>
+
+    <!-- Customer Directory Table -->
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">Customer Directory</div>
+          <div class="card-sub">High-value customers aggregated from database</div>
+        </div>
+        <input type="text" placeholder="Search customers…" oninput="filterCustomerTable(this.value)"
+          style="background:var(--surface);border:1px solid var(--card-border);color:var(--text);font-family:var(--font);font-size:12px;padding:6px 12px;border-radius:7px;outline:none;width:200px;">
+      </div>
+      <table class="data-table" id="customerTable">
+        <thead>
+          <tr>
+            <th>Customer Name</th>
+            <th>Region</th>
+            <th>Primary Category</th>
+            <th>Total Orders</th>
+            <th>Total Spend</th>
+            <th>Avg Order Value</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="customerBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- VIEW 4: INSIGHTS & AI -->
+  <div id="view-insights" class="view-page">
+    <div class="insights-grid">
+      <!-- Left side: AI Executive Insights -->
+      <div>
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Executive Summary</div>
+              <div class="card-sub">Automated financial and operations summary</div>
+            </div>
+            <span class="pill up" style="font-size: 10px;">Calculated Live</span>
+          </div>
+          <div id="insightsTextSummary" style="font-size: 13px; line-height: 1.6; color: var(--text-2);">
+            <!-- Populated dynamically -->
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Business Recommendations & Anomaly Alerts</div>
+          </div>
+          <div id="recommendationsList" style="display: flex; flex-direction: column; gap: 12px;">
+            <!-- Populated dynamically -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Right side: AI Analyst Chatbot -->
+      <div class="chat-container">
+        <div class="chat-header">
+          <div class="avatar" style="width: 26px; height: 26px; background: var(--accent);">AI</div>
+          <div>
+            <div style="font-size: 12px; font-weight: 600;">RevScope AI Analyst</div>
+            <div style="font-size: 10px; color: var(--green);">Ready to analyze active dataset</div>
+          </div>
+        </div>
+        
+        <div class="chat-messages" id="chatMessages">
+          <div class="chat-message ai">
+            Hello! I am your RevScope AI Business Analyst. I can query the currently loaded dataset. 
+            Try clicking one of the quick questions below or type your own query!
+          </div>
+        </div>
+
+        <div class="chat-suggestions">
+          <button class="chat-suggest-btn" onclick="sendChat('Who is our top performing customer?')">Top Customer?</button>
+          <button class="chat-suggest-btn" onclick="sendChat('What is the highest selling product?')">Top Product?</button>
+          <button class="chat-suggest-btn" onclick="sendChat('Provide a Q4 performance summary')">Q4 Summary</button>
+          <button class="chat-suggest-btn" onclick="sendChat('Which region has the lowest profit margin?')">Lowest Region</button>
+        </div>
+
+        <div class="chat-input-area">
+          <input type="text" id="chatInput" class="chat-input" placeholder="Ask about products, margins, trends..." onkeydown="if(event.key === 'Enter') handleSendChat()">
+          <button class="btn btn-primary" onclick="handleSendChat()" style="padding: 7px 14px;">Send</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- VIEW 5: INTEGRATIONS -->
+  <div id="view-integrations" class="view-page">
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">Data Warehouse Connectors</div>
+          <div class="card-sub">Simulate database connections to import production data streams</div>
+        </div>
+      </div>
+      
+      <div class="int-grid">
+        <div class="int-card">
+          <div class="int-card-header">
+            <div class="int-logo" style="background:#336791; color:#fff">PG</div>
+            <span class="int-badge connected" id="badge-pg">Connected</span>
+          </div>
+          <div style="font-weight: 500; font-size: 13px;">PostgreSQL Production</div>
+          <div style="font-size: 11px; color: var(--text-3)">pg-db-prod.revscope-data.internal</div>
+          <button class="btn" style="margin-top: 10px; width: 100%; font-size: 11px;" onclick="selectDatabase('pg')">Configure</button>
+        </div>
+
+        <div class="int-card">
+          <div class="int-card-header">
+            <div class="int-logo" style="background:#00758f; color:#fff">MY</div>
+            <span class="int-badge idle" id="badge-mysql">Idle</span>
+          </div>
+          <div style="font-weight: 500; font-size: 13px;">MySQL Analytics</div>
+          <div style="font-size: 11px; color: var(--text-3)">mysql-warehouse.analytics.internal</div>
+          <button class="btn" style="margin-top: 10px; width: 100%; font-size: 11px;" onclick="selectDatabase('mysql')">Connect</button>
+        </div>
+
+        <div class="int-card">
+          <div class="int-card-header">
+            <div class="int-logo" style="background:#29b6f6; color:#fff">SF</div>
+            <span class="int-badge idle" id="badge-salesforce">Idle</span>
+          </div>
+          <div style="font-weight: 500; font-size: 13px;">Salesforce API</div>
+          <div style="font-size: 11px; color: var(--text-3)">api.salesforce.v1.revscope</div>
+          <button class="btn" style="margin-top: 10px; width: 100%; font-size: 11px;" onclick="selectDatabase('salesforce')">Connect</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- SQL Simulator card -->
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">SQL Query Console</div>
+          <div class="card-sub">Query tables like <code>orders</code>, <code>customers</code>, and <code>margins</code> in real-time</div>
+        </div>
+        <select class="select-sm" id="sqlPresetQuery" onchange="pastePresetSql(this.value)">
+          <option value="">-- Load Template Query --</option>
+          <option value="SELECT * FROM orders ORDER BY revenue DESC LIMIT 10;">Top Orders</option>
+          <option value="SELECT * FROM orders WHERE category = 'Electronics';">Electronics Only</option>
+          <option value="SELECT * FROM orders WHERE margin > 55;">High Margin Items</option>
+          <option value="SELECT * FROM orders WHERE region = 'West';">West Region Sales</option>
+        </select>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 10px;">
+        <textarea id="sqlQueryText" style="width: 100%; height: 100px; background: #090b0f; border: 1px solid var(--card-border); color: #22d3a5; font-family: var(--mono); font-size: 12px; padding: 12px; border-radius: 8px; outline: none; resize: none;">SELECT * FROM orders ORDER BY date ASC;</textarea>
+        <div style="display: flex; gap: 10px; justify-content: flex-end;">
+          <button class="btn" onclick="testDbConnection()">Test Ping</button>
+          <button class="btn btn-primary" onclick="executeSqlSim()">Run SQL Query</button>
+        </div>
+      </div>
+
+      <div class="db-terminal" id="dbTerminal">
+        RevScope Terminal v2.1.0-Sim
+        Active DB Connection: postgresql://admin:secret@pg-db-prod.revscope-data.internal:5432/ecommerce
+        Type SQL query and click "Run SQL Query" to fetch database records.
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<!-- IMPORT WIZARD OVERLAY MODAL -->
+<div class="modal-overlay" id="importModal">
+  <div class="modal-card">
+    <div class="modal-header">
+      <div class="modal-title" id="importModalTitle">Import Sales & Revenue Dataset</div>
+      <button class="modal-close" onclick="closeImportModal()">×</button>
+    </div>
+    
+    <div class="modal-tabs">
+      <div class="modal-tab active" id="tab-file" onclick="setImportTab('file')">Upload File</div>
+      <div class="modal-tab" id="tab-db" onclick="setImportTab('db')">Database Connection</div>
+      <div class="modal-tab" id="tab-preset" onclick="setImportTab('preset')">Sample Datasets</div>
+      <div class="modal-tab" id="tab-mapping" style="display: none;" onclick="setImportTab('mapping')">Column Mapping</div>
+    </div>
+
+    <div class="modal-body">
+      <!-- File Upload Body -->
+      <div id="body-file" class="import-body-section" style="display: block;">
+        <div class="drag-drop-zone" id="dropZone" onclick="document.getElementById('modalFileInput').click()">
+          <div class="drag-drop-icon">📁</div>
+          <div class="drag-drop-text">
+            <strong>Drag & drop CSV or Excel</strong> file here, or click to browse<br>
+            <span style="font-size: 11px; color: var(--text-3);">Supports .csv, .xlsx, .xls formats</span>
+          </div>
+          <input type="file" id="modalFileInput" accept=".csv,.xlsx,.xls" onchange="handleModalFileSelect(event)" style="display:none">
+        </div>
+        <div id="fileUploadStatus" style="margin-top: 14px; font-size: 12px; text-align: center; color: var(--green);"></div>
+      </div>
+
+      <!-- Database Connection Body -->
+      <div id="body-db" class="import-body-section" style="display: none;">
+        <div class="db-form">
+          <div class="form-group">
+            <label>Database Type</label>
+            <select id="dbModalType" class="form-input">
+              <option value="pg">PostgreSQL</option>
+              <option value="mysql">MySQL Server</option>
+              <option value="sqlite">SQLite (Local File)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Host Endpoint</label>
+            <input type="text" id="dbModalHost" class="form-input" value="db-warehouse.revscope.internal">
+          </div>
+          <div class="form-group">
+            <label>Username</label>
+            <input type="text" id="dbModalUser" class="form-input" value="admin_sales">
+          </div>
+          <div class="form-group">
+            <label>Password</label>
+            <input type="password" id="dbModalPass" class="form-input" value="••••••••••••••">
+          </div>
+          <div class="form-group full">
+            <label>Database Name</label>
+            <input type="text" id="dbModalName" class="form-input" value="revscope_sales_prod">
+          </div>
+        </div>
+        <div style="display: flex; gap: 10px; justify-content: flex-end;">
+          <button class="btn" onclick="testModalDbConnection()">Test Connection</button>
+          <button class="btn btn-primary" id="btnDbModalImport" onclick="importFromModalDb()">Fetch & Import</button>
+        </div>
+        <div class="db-terminal" id="dbModalTerminal" style="min-height: 80px; margin-top: 12px;">
+          Waiting for database configuration...
+        </div>
+      </div>
+
+      <!-- Sample Presets Body -->
+      <div id="body-preset" class="import-body-section" style="display: none;">
+        <div class="dataset-grid">
+          <div class="dataset-card" onclick="loadSamplePreset('tech')">
+            <div class="dataset-name" style="color: var(--accent);">Electronics Store Q4 (Default)</div>
+            <div class="dataset-desc">High product prices, significant seasonal holiday spikes in Nov/Dec, 45% margins.</div>
+          </div>
+          <div class="dataset-card" onclick="loadSamplePreset('fashion')">
+            <div class="dataset-name" style="color: var(--green);">Global Apparel & Fashion</div>
+            <div class="dataset-desc">Steady clothing product line, medium order sizes, customer directory, 55% margins.</div>
+          </div>
+          <div class="dataset-card" onclick="loadSamplePreset('grocery')">
+            <div class="dataset-name" style="color: var(--yellow);">Organic Fresh Grocery Mart</div>
+            <div class="dataset-desc">High transactions count, low unit pricing ($2-$12), uniform sales trend, 15% margins.</div>
+          </div>
+          <div class="dataset-card" onclick="loadSamplePreset('saas')">
+            <div class="dataset-name" style="color: var(--purple);">Enterprise SaaS Platform</div>
+            <div class="dataset-desc">Low unit volume, monthly recurring licensing revenues, very high profit margins (90%).</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Column Schema Mapping Body -->
+      <div id="body-mapping" class="import-body-section" style="display: none;">
+        <div style="font-size: 12px; color: var(--text-2); margin-bottom: 12px;">
+          Select columns from your imported file that correspond to the system fields below:
+        </div>
+        <div id="mappingFieldsContainer" style="display: flex; flex-direction: column; gap: 8px;">
+          <!-- Generated dynamically on file load -->
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-footer" id="modalFooterButtons">
+      <button class="btn" onclick="closeImportModal()">Cancel</button>
+      <button class="btn btn-primary" id="modalApplyBtn" style="display:none;" onclick="applyColumnMapping()">Apply & Load Data</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast Alert -->
+<div class="toast" id="toast">
+  <div class="toast-dot"></div>
+  <span id="toastMsg">Data loaded</span>
+</div>
+
+<script>
+// ── Core Application State ──────────────────────────────────────────
+let rawTransactions = []; // The list of parsed transactional orders
+let activeDatasetName = "Electronics Store Q4";
+let currentView = "view-overview";
+let trendChart, gaugeChart, catChart, regChart;
+let cumRevChart, marginProductChart, scatterChart;
+let customerSegmentChart, customerDistChart;
+
+// Dynamic filter variables
+let uniqueCategories = new Set();
+let uniqueRegions = new Set();
+
+// DB Simulations state
+let activeDb = 'pg';
+let dbConnections = {
+  pg: { name: 'PostgreSQL Production', host: 'pg-db-prod.revscope-data.internal', status: 'connected' },
+  mysql: { name: 'MySQL Analytics', host: 'mysql-warehouse.analytics.internal', status: 'idle' },
+  salesforce: { name: 'Salesforce API', host: 'api.salesforce.v1.revscope', status: 'idle' }
+};
+
+// Temp parsed data in modal mapping
+let tempParsedRows = [];
+let tempParsedHeaders = [];
+
+// Default mock transaction generator for sample dataset scenarios
+function generateMockData(scenarioType) {
+  let data = [];
+  let startDate = new Date(2026, 9, 1); // October 1st
+  let endDate = new Date(2026, 11, 31); // December 31st
+  let diffTime = Math.abs(endDate - startDate);
+  let totalDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+  
+  let products = [];
+  let customers = [];
+  let regions = ['North', 'South', 'East', 'West'];
+  
+  if (scenarioType === 'tech') {
+    products = [
+      { name: 'Pro Speaker X12', cat: 'Electronics', price: 200, margin: 48, col: '#4f7ef8' },
+      { name: 'TrailBlaze Jacket', cat: 'Apparel', price: 70, margin: 52, col: '#22d3a5' },
+      { name: 'SmartGarden Kit', cat: 'Home', price: 80, margin: 41, col: '#f5a623' },
+      { name: 'FitCore Watch', cat: 'Sports', price: 150, margin: 44, col: '#a78bfa' },
+      { name: 'GlowSerum Pro', cat: 'Beauty', price: 30, margin: 65, col: '#06b6d4' },
+      { name: 'AirBass Earbuds', cat: 'Electronics', price: 40, margin: 38, col: '#4f7ef8' },
+      { name: 'CoreLift Shorts', cat: 'Apparel', price: 18, margin: 55, col: '#22d3a5' }
+    ];
+    customers = ['Apex Corp', 'Zephyr Inc', 'Initech', 'Hooli', 'Veer Group', 'Nexus Ltd', 'Acme Corp', 'Globex', 'Soylent Co'];
+  } else if (scenarioType === 'fashion') {
+    products = [
+      { name: 'Urban Trail Boots', cat: 'Footwear', price: 120, margin: 55, col: '#4f7ef8' },
+      { name: 'Lux Leather Bag', cat: 'Accessories', price: 150, margin: 60, col: '#22d3a5' },
+      { name: 'Cashmere Sweater', cat: 'Apparel', price: 90, margin: 50, col: '#f5a623' },
+      { name: 'Summer Linen Shirt', cat: 'Apparel', price: 50, margin: 48, col: '#a78bfa' },
+      { name: 'Sports Run Sneaker', cat: 'Footwear', price: 85, margin: 42, col: '#06b6d4' },
+      { name: 'Classic Gold Watch', cat: 'Accessories', price: 220, margin: 65, col: '#4f7ef8' }
+    ];
+    customers = ['Sophia Loren', 'James Dean', 'Marilyn Monroe', 'Elvis Presley', 'Grace Kelly', 'Audrey Hepburn', 'Steve McQueen', 'Humphrey Bogart'];
+  } else if (scenarioType === 'grocery') {
+    products = [
+      { name: 'Organic Avocados (Pack)', cat: 'Produce', price: 8, margin: 18, col: '#22d3a5' },
+      { name: 'Almond Milk Oat 1L', cat: 'Dairy', price: 5, margin: 15, col: '#06b6d4' },
+      { name: 'Artisan Sourdough', cat: 'Bakery', price: 6, margin: 25, col: '#f5a623' },
+      { name: 'Organic Quinoa 500g', cat: 'Pantry', price: 12, margin: 20, col: '#a78bfa' },
+      { name: 'Grass-Fed Butter 250g', cat: 'Dairy', price: 7, margin: 12, col: '#06b6d4' },
+      { name: 'Fresh Strawberries (Tub)', cat: 'Produce', price: 4, margin: 16, col: '#22d3a5' }
+    ];
+    customers = ['Local Bistro', 'Fresh & Co', 'Healthy Foods', 'Organic Diner', 'Daily Bread Cafe', 'Green Eatery', 'Nutri-Kitchen'];
+  } else if (scenarioType === 'saas') {
+    products = [
+      { name: 'Developer Pro Plan', cat: 'SaaS Subscriptions', price: 99, margin: 92, col: '#4f7ef8' },
+      { name: 'Enterprise Suite License', cat: 'SaaS Subscriptions', price: 1200, margin: 88, col: '#22d3a5' },
+      { name: 'AI API seat add-on', cat: 'Add-ons', price: 29, margin: 95, col: '#06b6d4' },
+      { name: 'Premium Support SLA', cat: 'Add-ons', price: 199, margin: 85, col: '#a78bfa' },
+      { name: 'Migration & Setup', cat: 'Professional Services', price: 5000, margin: 60, col: '#f5a623' }
+    ];
+    customers = ['Enterprise AI Inc', 'Fintech Labs', 'SaaS Corp', 'DevOps Studio', 'Retail Hub', 'DataStream', 'Net-Tech Solutions'];
+  }
+
+  let txCount = scenarioType === 'grocery' ? 240 : 180;
+  for (let i = 0; i < txCount; i++) {
+    let randDays = Math.floor(Math.random() * totalDays);
+    let dateObj = new Date(startDate.getTime() + randDays * 24 * 60 * 60 * 1000);
+    let dateStr = dateObj.toISOString().split('T')[0];
+    
+    let prod = products[Math.floor(Math.random() * products.length)];
+    let region = regions[Math.floor(Math.random() * regions.length)];
+    let customer = customers[Math.floor(Math.random() * customers.length)];
+    
+    let units = 1;
+    if (scenarioType === 'grocery') {
+      units = Math.floor(Math.random() * 8) + 1;
+    } else if (scenarioType === 'tech' || scenarioType === 'fashion') {
+      units = Math.floor(Math.random() * 3) + 1;
+    }
+    
+    let revenue = prod.price * units;
+    // Add Q4 spikes (Holiday sales spikes)
+    if (scenarioType === 'tech' || scenarioType === 'fashion') {
+      let m = dateObj.getMonth();
+      if (m === 10) revenue *= 1.25; // Nov black friday
+      if (m === 11) revenue *= 1.45; // Dec holidays
+    }
+    revenue = Math.round(revenue * 100) / 100;
+    
+    data.push({
+      date: dateStr,
+      product: prod.name,
+      category: prod.cat,
+      units: units,
+      revenue: revenue,
+      margin: prod.margin,
+      region: region,
+      customer: customer,
+      col: prod.col
+    });
+  }
+  
+  return data;
+}
+
+// ── Views & Tabs Switching ─────────────────────────────────────────
+function switchView(viewId, el) {
+  currentView = viewId;
+  document.querySelectorAll('.view-page').forEach(v => v.style.display = 'none');
+  document.getElementById(viewId).style.display = 'block';
+  
+  document.querySelectorAll('.sidebar-nav .nav-item').forEach(item => item.classList.remove('active'));
+  if (el) el.classList.add('active');
+
+  let title = 'Overview';
+  if (viewId === 'view-revenue') title = 'Revenue & Sales Deep-dive';
+  else if (viewId === 'view-customers') title = 'Customer Value & Cohorts';
+  else if (viewId === 'view-insights') title = 'Executive AI Insights';
+  else if (viewId === 'view-integrations') title = 'Database Integrations';
+  
+  document.querySelector('.topbar-title').innerHTML = `${title} <span>/ ${activeDatasetName}</span>`;
+
+  // Draw chart views dynamically depending on screen
+  setTimeout(() => {
+    rebuildCharts();
+  }, 50);
+}
+
+// ── Filtering Engine ────────────────────────────────────────────────
+function getFilteredData() {
+  let dateVal = document.getElementById('filterDate').value;
+  let catVal = document.getElementById('filterCategory').value;
+  let regVal = document.getElementById('filterRegion').value;
+  
+  return rawTransactions.filter(t => {
+    // Date filter
+    if (dateVal !== 'all') {
+      let month = new Date(t.date).getMonth(); // 9=Oct, 10=Nov, 11=Dec
+      if (dateVal === 'oct' && month !== 9) return false;
+      if (dateVal === 'nov' && month !== 10) return false;
+      if (dateVal === 'dec' && month !== 11) return false;
+    }
+    // Category filter
+    if (catVal !== 'all' && t.category !== catVal) return false;
+    // Region filter
+    if (regVal !== 'all' && t.region !== regVal) return false;
+    
+    return true;
+  });
+}
+
+function onFilterChange() {
+  updateDashboard();
+  showToast("Filters applied successfully.");
+}
+
+function resetFilters() {
+  document.getElementById('filterDate').value = 'all';
+  document.getElementById('filterCategory').value = 'all';
+  document.getElementById('filterRegion').value = 'all';
+  updateDashboard();
+  showToast("All filters reset.");
+}
+
+function updateFilterDropdownOptions() {
+  // Extract categories & regions dynamically
+  uniqueCategories.clear();
+  uniqueRegions.clear();
+  
+  rawTransactions.forEach(t => {
+    if (t.category) uniqueCategories.add(t.category);
+    if (t.region) uniqueRegions.add(t.region);
+  });
+  
+  // Re-populate Category Dropdown
+  let catSel = document.getElementById('filterCategory');
+  let currentCatVal = catSel.value;
+  catSel.innerHTML = '<option value="all">All Categories</option>';
+  Array.from(uniqueCategories).sort().forEach(c => {
+    catSel.innerHTML += `<option value="${c}">${c}</option>`;
+  });
+  if (uniqueCategories.has(currentCatVal)) catSel.value = currentCatVal;
+  
+  // Re-populate Region Dropdown
+  let regSel = document.getElementById('filterRegion');
+  let currentRegVal = regSel.value;
+  regSel.innerHTML = '<option value="all">All Regions</option>';
+  Array.from(uniqueRegions).sort().forEach(r => {
+    regSel.innerHTML += `<option value="${r}">${r}</option>`;
+  });
+  if (uniqueRegions.has(currentRegVal)) regSel.value = currentRegVal;
+}
+
+// ── Dashboard Calculations & Rendering ─────────────────────────────
+function updateDashboard() {
+  let fd = getFilteredData();
+  
+  // Sort chronologically
+  fd.sort((a,b) => a.date.localeCompare(b.date));
+  
+  // Divide data into half for period comparison growth stats
+  let half = Math.floor(fd.length / 2);
+  let priorHalf = fd.slice(0, half);
+  let currentHalf = fd.slice(half);
+
+  // Helper stats computer
+  function getStats(arr) {
+    let rev = arr.reduce((acc, t) => acc + t.revenue, 0);
+    let sales = arr.reduce((acc, t) => acc + t.units, 0);
+    let aov = arr.length > 0 ? (rev / arr.length) : 0;
+    
+    let totalMarginProd = arr.reduce((acc, t) => acc + (t.revenue * (t.margin / 100)), 0);
+    let avgMargin = rev > 0 ? (totalMarginProd / rev) * 100 : 0;
+    
+    let custSet = new Set(arr.map(t => t.customer));
+    let custCount = custSet.size;
+    
+    return { rev, sales, aov, avgMargin, custCount };
+  }
+
+  let totalStats = getStats(fd);
+  let currentStats = getStats(currentHalf);
+  let priorStats = getStats(priorHalf);
+
+  // Format functions
+  function pctChange(curr, prior) {
+    if (prior === 0) return 0;
+    return (((curr - prior) / prior) * 100).toFixed(1);
+  }
+  function diffPp(curr, prior) {
+    return (curr - prior).toFixed(1);
+  }
+  function fmtK(n) {
+    return n >= 1000000 ? '$' + (n / 1000000).toFixed(1) + 'M' : n >= 1000 ? '$' + (n / 1000).toFixed(0) + 'K' : '$' + n.toFixed(0);
+  }
+
+  // Populate View 1: Overview KPIs
+  document.getElementById('k-rev').textContent = fmtK(totalStats.rev);
+  let revGrowth = pctChange(currentStats.rev, priorStats.rev);
+  document.getElementById('k-rev-d').innerHTML = `${parseFloat(revGrowth) >= 0 ? '↑' : '↓'} ${Math.abs(revGrowth)}% vs prior half`;
+  document.getElementById('k-rev-d').className = `kpi-delta ${parseFloat(revGrowth) >= 0 ? 'up' : 'down'}`;
+
+  document.getElementById('k-sales').textContent = totalStats.sales.toLocaleString();
+  let salesGrowth = pctChange(currentStats.sales, priorStats.sales);
+  document.getElementById('k-sales-d').innerHTML = `${parseFloat(salesGrowth) >= 0 ? '↑' : '↓'} ${Math.abs(salesGrowth)}% vs prior half`;
+  document.getElementById('k-sales-d').className = `kpi-delta ${parseFloat(salesGrowth) >= 0 ? 'up' : 'down'}`;
+
+  document.getElementById('k-aov').textContent = '$' + totalStats.aov.toFixed(0);
+  document.getElementById('k-aov-d').textContent = 'average ticket value';
+
+  document.getElementById('k-margin').textContent = totalStats.avgMargin.toFixed(1) + '%';
+  let marginDiff = diffPp(currentStats.avgMargin, priorStats.avgMargin);
+  document.getElementById('k-margin-d').innerHTML = `${parseFloat(marginDiff) >= 0 ? '↑' : '↓'} ${Math.abs(marginDiff)}pp vs prior half`;
+  document.getElementById('k-margin-d').className = `kpi-delta ${parseFloat(marginDiff) >= 0 ? 'up' : 'down'}`;
+
+  document.getElementById('k-cust').textContent = totalStats.custCount.toLocaleString();
+  let custGrowth = pctChange(currentStats.custCount, priorStats.custCount);
+  document.getElementById('k-cust-d').innerHTML = `${parseFloat(custGrowth) >= 0 ? '↑' : '↓'} ${Math.abs(custGrowth)}% vs prior half`;
+  document.getElementById('k-cust-d').className = `kpi-delta ${parseFloat(custGrowth) >= 0 ? 'up' : 'down'}`;
+
+  // Target attainment calculation (Simulated Target = 1.05 * average revenue)
+  let simulatedTargetRate = 96; // default fallback
+  if (totalStats.rev > 0) {
+    let mockTarget = (priorStats.rev * 1.08) || (totalStats.rev * 0.98);
+    simulatedTargetRate = Math.round((totalStats.rev / mockTarget) * 100);
+  }
+  document.getElementById('gaugeVal').textContent = simulatedTargetRate + '%';
+
+  // Populate View 2: Revenue Deep Dive KPIs
+  document.getElementById('r-cum-rev').textContent = '$' + totalStats.rev.toLocaleString(undefined, {maximumFractionDigits: 0});
+  let profitPool = fd.reduce((acc, t) => acc + (t.revenue * (t.margin / 100)), 0);
+  document.getElementById('r-profit').textContent = '$' + profitPool.toLocaleString(undefined, {maximumFractionDigits: 0});
+  document.getElementById('r-avg-tx').textContent = '$' + (fd.length > 0 ? (totalStats.rev / fd.length).toFixed(2) : '0.00');
+  document.getElementById('r-avg-margin').textContent = totalStats.avgMargin.toFixed(1) + '%';
+  
+  // Find top Category by revenue
+  let catSummary = {};
+  fd.forEach(t => {
+    catSummary[t.category] = (catSummary[t.category] || 0) + t.revenue;
+  });
+  let topCat = '-';
+  let topCatRev = 0;
+  for (let key in catSummary) {
+    if (catSummary[key] > topCatRev) {
+      topCat = key;
+      topCatRev = catSummary[key];
+    }
+  }
+  document.getElementById('r-top-cat').textContent = topCat;
+  let topCatPct = totalStats.rev > 0 ? ((topCatRev / totalStats.rev) * 100).toFixed(1) : 0;
+  document.getElementById('r-top-cat-share').textContent = topCatPct + '% share';
+
+  // Populate View 3: Customer Dashboard KPIs
+  document.getElementById('c-total').textContent = totalStats.custCount;
+  let customerAggregation = {};
+  fd.forEach(t => {
+    if (!customerAggregation[t.customer]) {
+      customerAggregation[t.customer] = { count: 0, spend: 0, region: t.region, catMap: {} };
+    }
+    customerAggregation[t.customer].count += 1;
+    customerAggregation[t.customer].spend += t.revenue;
+    customerAggregation[t.customer].catMap[t.category] = (customerAggregation[t.customer].catMap[t.category] || 0) + t.revenue;
+  });
+
+  let vipsCount = Object.values(customerAggregation).filter(c => c.spend > 5000).length;
+  document.getElementById('c-vips').textContent = vipsCount;
+
+  let avgLTV = totalStats.custCount > 0 ? (totalStats.rev / totalStats.custCount) : 0;
+  document.getElementById('c-ltv').textContent = '$' + avgLTV.toLocaleString(undefined, {maximumFractionDigits: 0});
+
+  let avgFreq = totalStats.custCount > 0 ? (fd.length / totalStats.custCount) : 0;
+  document.getElementById('c-freq').textContent = avgFreq.toFixed(1);
+
+  // Re-draw tables
+  renderProductsTable(fd, priorHalf);
+  renderCustomerTable(customerAggregation);
+  renderActivityFeed(fd);
+
+  // Generate automated AI Text Insights
+  generateExecutiveInsights(fd, totalStats, topCat, topCatPct);
+
+  // Redraw charts
+  rebuildCharts();
+}
+
+function renderProductsTable(fd, priorHalf) {
+  // Aggregate products
+  let prodMap = {};
+  fd.forEach(t => {
+    if (!prodMap[t.product]) {
+      prodMap[t.product] = { name: t.product, cat: t.category, units: 0, rev: 0, sumMargin: 0, col: t.col || '#4f7ef8' };
+    }
+    prodMap[t.product].units += t.units;
+    prodMap[t.product].rev += t.revenue;
+    prodMap[t.product].sumMargin += t.margin * t.revenue;
+  });
+
+  let priorProdMap = {};
+  priorHalf.forEach(t => {
+    priorProdMap[t.product] = (priorProdMap[t.product] || 0) + t.revenue;
+  });
+
+  let productsArray = Object.values(prodMap).map(p => {
+    let avgMargin = p.rev > 0 ? Math.round(p.sumMargin / p.rev) : 0;
+    let priorRev = priorProdMap[p.name] || 0;
+    let delta = priorRev > 0 ? Math.round(((p.rev - priorRev) / priorRev) * 100) : 0;
+    return { ...p, avgMargin, delta };
+  });
+
+  productsArray.sort((a,b) => b.rev - a.rev);
+  let totalRev = productsArray.reduce((acc, p) => acc + p.rev, 0);
+
+  let body = document.getElementById('prodBody');
+  body.innerHTML = '';
+  productsArray.forEach((p, idx) => {
+    let share = totalRev > 0 ? ((p.rev / totalRev) * 100).toFixed(1) : '0';
+    let pillClass = p.delta >= 0 ? 'up' : 'down';
+    let deltaText = p.delta >= 0 ? `↑ ${p.delta}%` : `↓ ${Math.abs(p.delta)}%`;
+    if (p.delta === 0) deltaText = '0%';
+    
+    body.innerHTML += `
+      <tr>
+        <td><span class="rank-badge">${idx + 1}</span></td>
+        <td><span class="product-dot" style="background:${p.col}"></span>${p.name}</td>
+        <td style="color:var(--text-2)">${p.cat}</td>
+        <td style="font-family:var(--mono)">${p.units.toLocaleString()}</td>
+        <td style="font-family:var(--mono);font-weight:500">$${p.rev.toLocaleString(undefined, {maximumFractionDigits:0})}</td>
+        <td style="color:var(--text-2)">${p.avgMargin}%</td>
+        <td>
+          <div class="progress-bar-bg"><div class="progress-bar-fill" style="background:${p.col};width:${Math.min(100, Math.round(p.rev/totalRev*100*3.5))}%"></div></div>
+          <div style="font-size:10px;color:var(--text-3);margin-top:2px;font-family:var(--mono)">${share}%</div>
+        </td>
+        <td><span class="pill ${pillClass}">${deltaText}</span></td>
+      </tr>
+    `;
+  });
+}
+
+function filterTable(query) {
+  let fd = getFilteredData();
+  let half = Math.floor(fd.length / 2);
+  let filtered = fd.filter(t => t.product.toLowerCase().includes(query.toLowerCase()) || t.category.toLowerCase().includes(query.toLowerCase()));
+  renderProductsTable(filtered, fd.slice(0, half));
+}
+
+function renderCustomerTable(customerAggregation) {
+  let customersArray = Object.entries(customerAggregation).map(([name, data]) => {
+    // Get primary category (the one they spent most on)
+    let bestCat = '-';
+    let maxSpend = 0;
+    for (let [cat, spend] of Object.entries(data.catMap)) {
+      if (spend > maxSpend) {
+        maxSpend = spend;
+        bestCat = cat;
+      }
+    }
+    let aov = data.count > 0 ? (data.spend / data.count) : 0;
+    let status = data.spend > 5000 ? 'VIP' : (data.count > 3 ? 'Loyal' : 'Active');
+    return { name, ...data, bestCat, aov, status };
+  });
+
+  // Sort by Spend descending
+  customersArray.sort((a,b) => b.spend - a.spend);
+
+  let body = document.getElementById('customerBody');
+  body.innerHTML = '';
+  customersArray.forEach(c => {
+    let statusPill = 'rgba(255,255,255,0.06)';
+    let statusCol = 'var(--text-2)';
+    if (c.status === 'VIP') {
+      statusPill = 'rgba(167,139,250,0.12)';
+      statusCol = 'var(--purple)';
+    } else if (c.status === 'Loyal') {
+      statusPill = 'rgba(79,126,248,0.12)';
+      statusCol = 'var(--accent)';
+    }
+    
+    body.innerHTML += `
+      <tr>
+        <td><strong>${c.name}</strong></td>
+        <td>${c.region}</td>
+        <td style="color:var(--text-2)">${c.bestCat}</td>
+        <td style="font-family:var(--mono)">${c.count}</td>
+        <td style="font-family:var(--mono);font-weight:500">$${c.spend.toLocaleString(undefined, {maximumFractionDigits:0})}</td>
+        <td style="font-family:var(--mono);color:var(--text-2)">$${c.aov.toFixed(0)}</td>
+        <td><span class="pill" style="background:${statusPill}; color:${statusCol}">${c.status}</span></td>
+      </tr>
+    `;
+  });
+}
+
+function filterCustomerTable(query) {
+  let fd = getFilteredData();
+  let customerAggregation = {};
+  fd.forEach(t => {
+    if (!customerAggregation[t.customer]) {
+      customerAggregation[t.customer] = { count: 0, spend: 0, region: t.region, catMap: {} };
+    }
+    customerAggregation[t.customer].count += 1;
+    customerAggregation[t.customer].spend += t.revenue;
+    customerAggregation[t.customer].catMap[t.category] = (customerAggregation[t.customer].catMap[t.category] || 0) + t.revenue;
+  });
+  
+  let filteredAgg = {};
+  for (let [name, data] of Object.entries(customerAggregation)) {
+    if (name.toLowerCase().includes(query.toLowerCase()) || data.region.toLowerCase().includes(query.toLowerCase())) {
+      filteredAgg[name] = data;
+    }
+  }
+  renderCustomerTable(filteredAgg);
+}
+
+function renderActivityFeed(fd) {
+  // Take last 5 transactions
+  let last5 = [...fd].slice(-5).reverse();
+  let list = document.getElementById('activityList');
+  list.innerHTML = '';
+  
+  if (last5.length === 0) {
+    list.innerHTML = '<div style="font-size:12px; color:var(--text-3); text-align:center; padding: 20px 0;">No matching sales transactions.</div>';
+    return;
+  }
+
+  last5.forEach(t => {
+    let mockTimes = ['Just now', '12 min ago', '42 min ago', '2 hr ago', '5 hr ago'];
+    let idx = Math.floor(Math.random() * mockTimes.length);
+    let color = t.col || '#4f7ef8';
+    list.innerHTML += `
+      <div class="activity-item">
+        <div class="activity-dot-wrap"><div class="activity-dot" style="background:${color}"></div></div>
+        <div>
+          <div class="activity-text"><strong>$${t.revenue.toLocaleString()}</strong> order of <strong>${t.product}</strong> in ${t.region}</div>
+          <div class="activity-time">${mockTimes[idx]}</div>
+        </div>
+      </div>
+    `;
+  });
+}
+
+// ── Chart.js Configurations ─────────────────────────────────────────
+function rebuildCharts() {
+  let fd = getFilteredData();
+  if (fd.length === 0) return;
+
+  // 1. Group Data by Time (Month, Week, or Day depending on date range)
+  let dateVal = document.getElementById('filterDate').value;
+  let timeLabels = [];
+  let timeRevenue = [];
+  let timeTarget = [];
+
+  if (dateVal === 'all') {
+    // Group by month
+    timeLabels = ['October', 'November', 'December'];
+    let octRev = fd.filter(t => new Date(t.date).getMonth() === 9).reduce((s,t)=>s+t.revenue, 0);
+    let novRev = fd.filter(t => new Date(t.date).getMonth() === 10).reduce((s,t)=>s+t.revenue, 0);
+    let decRev = fd.filter(t => new Date(t.date).getMonth() === 11).reduce((s,t)=>s+t.revenue, 0);
+    timeRevenue = [octRev, novRev, decRev];
+    // Generate targets
+    let avg = (octRev+novRev+decRev)/3;
+    timeTarget = [avg*0.9, avg*1.02, avg*1.08];
+  } else {
+    // Group by Weeks
+    let m = dateVal === 'oct' ? 9 : (dateVal === 'nov' ? 10 : 11);
+    timeLabels = ['Week 1', 'Week 2', 'Week 3', 'Week 4'];
+    let w1 = fd.filter(t => { let d = new Date(t.date); return d.getMonth() === m && d.getDate() <= 7; }).reduce((s,t)=>s+t.revenue, 0);
+    let w2 = fd.filter(t => { let d = new Date(t.date); return d.getMonth() === m && d.getDate() > 7 && d.getDate() <= 14; }).reduce((s,t)=>s+t.revenue, 0);
+    let w3 = fd.filter(t => { let d = new Date(t.date); return d.getMonth() === m && d.getDate() > 14 && d.getDate() <= 21; }).reduce((s,t)=>s+t.revenue, 0);
+    let w4 = fd.filter(t => { let d = new Date(t.date); return d.getMonth() === m && d.getDate() > 21; }).reduce((s,t)=>s+t.revenue, 0);
+    timeRevenue = [w1, w2, w3, w4];
+    let avg = (w1+w2+w3+w4)/4;
+    timeTarget = [avg*0.95, avg*0.98, avg*1.04, avg*1.03];
+  }
+
+  // Draw Overview Trend Line Chart
+  if (currentView === 'view-overview') {
+    if (trendChart) trendChart.destroy();
+    trendChart = new Chart(document.getElementById('trendChart'), {
+      type: 'line',
+      data: {
+        labels: timeLabels,
+        datasets: [
+          { label: 'Revenue', data: timeRevenue, borderColor: '#4f7ef8', backgroundColor: 'rgba(79,126,248,0.08)', borderWidth: 2, tension: 0.35, fill: true, pointRadius: 4 },
+          { label: 'Target', data: timeTarget, borderColor: 'rgba(34,211,165,0.5)', borderDash: [5, 4], borderWidth: 2, tension: 0.35, fill: false, pointRadius: 2 }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { display: false }, ticks: { color: '#8a92a8', font: { size: 10 } }, border: { color: 'rgba(255,255,255,0.06)' } },
+          y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#8a92a8', font: { size: 10 }, callback: v => '$' + (v/1000).toFixed(0) + 'K' }, border: { display: false } }
+        }
+      }
+    });
+
+    // Target attainment Gauge chart
+    let sumRev = timeRevenue.reduce((a,b)=>a+b, 0);
+    let sumTarget = timeTarget.reduce((a,b)=>a+b, 0);
+    let pctAttainment = sumTarget > 0 ? Math.round((sumRev / sumTarget) * 100) : 0;
+    
+    if (gaugeChart) gaugeChart.destroy();
+    gaugeChart = new Chart(document.getElementById('gaugeChart'), {
+      type: 'doughnut',
+      data: {
+        datasets: [{
+          data: [Math.min(pctAttainment, 100), Math.max(0, 100 - pctAttainment)],
+          backgroundColor: [pctAttainment >= 100 ? '#22d3a5' : pctAttainment >= 80 ? '#4f7ef8' : '#f5a623', 'rgba(255,255,255,0.04)'],
+          borderWidth: 0, cutout: '78%'
+        }]
+      },
+      options: { responsive: false, plugins: { legend: { display: false }, tooltip: { enabled: false } }, rotation: -90, circumference: 180 }
+    });
+
+    // Update mini-bars under gauge
+    let catRevMap = {};
+    fd.forEach(t => { catRevMap[t.category] = (catRevMap[t.category] || 0) + t.revenue; });
+    let listEl = document.getElementById('gaugeList');
+    listEl.innerHTML = '';
+    let idx = 0;
+    let colors = ['#4f7ef8', '#22d3a5', '#f5a623', '#a78bfa', '#06b6d4'];
+    for (let [cat, rev] of Object.entries(catRevMap).slice(0, 4)) {
+      let mockGoal = rev * 1.05;
+      let attain = Math.round((rev / mockGoal) * 100);
+      listEl.innerHTML += `
+        <div class="region-row">
+          <div class="region-name" style="width:80px;font-size:11px">${cat}</div>
+          <div class="region-bar-bg"><div class="region-bar-fill" style="background:${colors[idx % colors.length]};width:${attain}%"></div></div>
+          <div class="region-pct">${attain}%</div>
+        </div>
+      `;
+      idx++;
+    }
+
+    // Category Chart
+    updateCategoryChart();
+
+    // Region Donut Chart
+    let regMap = {};
+    fd.forEach(t => { regMap[t.region] = (regMap[t.region] || 0) + t.revenue; });
+    let regionsList = Object.keys(regMap);
+    let regionsRev = Object.values(regMap);
+    let totalRegRev = regionsRev.reduce((a,b)=>a+b, 0);
+    let regColors = ['#4f7ef8', '#22d3a5', '#f5a623', '#a78bfa'];
+
+    if (regChart) regChart.destroy();
+    regChart = new Chart(document.getElementById('regChart'), {
+      type: 'doughnut',
+      data: {
+        labels: regionsList,
+        datasets: [{ data: regionsRev, backgroundColor: regColors, borderWidth: 1.5, borderColor: '#181c26' }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false, cutout: '65%',
+        plugins: { legend: { display: false } }
+      }
+    });
+
+    // Region mini bars under donut
+    let barsEl = document.getElementById('regBars');
+    barsEl.innerHTML = '';
+    regionsList.forEach((r, i) => {
+      let pct = totalRegRev > 0 ? Math.round((regMap[r] / totalRegRev) * 100) : 0;
+      barsEl.innerHTML += `
+        <div class="region-row">
+          <div class="region-name">${r}</div>
+          <div class="region-bar-bg"><div class="region-bar-fill" style="background:${regColors[i % regColors.length]};width:${pct}%"></div></div>
+          <div class="region-pct">${pct}%</div>
+        </div>
+      `;
+    });
+  }
+
+  // Draw View 2: Revenue & Sales charts
+  if (currentView === 'view-revenue') {
+    // Cumulative Revenue Chart (Running Sum)
+    let cumulativeSums = [];
+    let run = 0;
+    // Map chronological dates to running sum
+    let timeline = fd.map(t => {
+      run += t.revenue;
+      return { date: t.date, sum: run };
+    });
+    // Sample every 10th row to keep points clean
+    let samples = [];
+    let interval = Math.max(1, Math.floor(timeline.length / 15));
+    for (let i = 0; i < timeline.length; i += interval) {
+      samples.push(timeline[i]);
+    }
+    if (timeline.length > 0 && samples[samples.length-1] !== timeline[timeline.length-1]) {
+      samples.push(timeline[timeline.length-1]);
+    }
+
+    if (cumRevChart) cumRevChart.destroy();
+    cumRevChart = new Chart(document.getElementById('cumRevChart'), {
+      type: 'line',
+      data: {
+        labels: samples.map(s => s.date),
+        datasets: [{
+          label: 'Cumulative Sales',
+          data: samples.map(s => s.sum),
+          borderColor: '#22d3a5',
+          backgroundColor: 'rgba(34,211,165,0.06)',
+          borderWidth: 2.5,
+          tension: 0.2,
+          fill: true,
+          pointRadius: 2
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { display: false }, ticks: { color: '#8a92a8', font: { size: 9 } } },
+          y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#8a92a8', font: { size: 10 }, callback: v => '$' + (v/1000).toFixed(0) + 'K' } }
+        }
+      }
+    });
+
+    // Margin comparison chart (by Product)
+    let prodMap = {};
+    fd.forEach(t => {
+      if (!prodMap[t.product]) {
+        prodMap[t.product] = { name: t.product, rev: 0, sumMargin: 0 };
+      }
+      prodMap[t.product].rev += t.revenue;
+      prodMap[t.product].sumMargin += t.margin * t.revenue;
+    });
+    let prods = Object.values(prodMap).map(p => ({
+      name: p.name,
+      margin: p.rev > 0 ? Math.round(p.sumMargin / p.rev) : 0
+    })).sort((a,b)=>b.margin - a.margin);
+
+    if (marginProductChart) marginProductChart.destroy();
+    marginProductChart = new Chart(document.getElementById('marginProductChart'), {
+      type: 'bar',
+      data: {
+        labels: prods.map(p => p.name),
+        datasets: [{
+          label: 'Margin %',
+          data: prods.map(p => p.margin),
+          backgroundColor: '#a78bfa',
+          borderRadius: 4
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { max: 100, grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#8a92a8', font: { size: 10 } } },
+          y: { grid: { display: false }, ticks: { color: '#8a92a8', font: { size: 10 } } }
+        }
+      }
+    });
+
+    // Profit Margin vs Units Scatter Chart
+    let scatterData = Object.values(
+      fd.reduce((acc, t) => {
+        if (!acc[t.product]) acc[t.product] = { name: t.product, x: 0, sumMargin: 0, rev: 0 };
+        acc[t.product].x += t.units;
+        acc[t.product].rev += t.revenue;
+        acc[t.product].sumMargin += t.margin * t.revenue;
+        return acc;
+      }, {})
+    ).map(p => ({
+      label: p.name,
+      x: p.x,
+      y: p.rev > 0 ? Math.round(p.sumMargin / p.rev) : 0
+    }));
+
+    if (scatterChart) scatterChart.destroy();
+    scatterChart = new Chart(document.getElementById('scatterChart'), {
+      type: 'scatter',
+      data: {
+        datasets: [{
+          label: 'Product Positioning',
+          data: scatterData,
+          backgroundColor: '#4f7ef8',
+          pointRadius: 7,
+          pointHoverRadius: 9
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          tooltip: {
+            callbacks: {
+              label: ctx => {
+                let item = scatterData[ctx.dataIndex];
+                return `${item.label}: ${item.x} Units, ${item.y}% Margin`;
+              }
+            }
+          }
+        },
+        scales: {
+          x: { title: { display: true, text: 'Units Sold', color: '#8a92a8', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#8a92a8' } },
+          y: { title: { display: true, text: 'Margin %', color: '#8a92a8', font: { size: 10 } }, max: 100, grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#8a92a8' } }
+        }
+      }
+    });
+  }
+
+  // Draw View 3: Customers charts
+  if (currentView === 'view-customers') {
+    // Aggregate customer list
+    let customerAggregation = {};
+    fd.forEach(t => {
+      if (!customerAggregation[t.customer]) customerAggregation[t.customer] = 0;
+      customerAggregation[t.customer] += t.revenue;
+    });
+
+    let customerSpend = Object.values(customerAggregation);
+    // Categorize customers
+    let ranges = { '$0-100': 0, '$100-500': 0, '$500-2K': 0, '$2K-5K': 0, '$5K+': 0 };
+    customerSpend.forEach(s => {
+      if (s <= 100) ranges['$0-100']++;
+      else if (s <= 500) ranges['$100-500']++;
+      else if (s <= 2000) ranges['$500-2K']++;
+      else if (s <= 5000) ranges['$2K-5K']++;
+      else ranges['$5K+']++;
+    });
+
+    if (customerSegmentChart) customerSegmentChart.destroy();
+    customerSegmentChart = new Chart(document.getElementById('customerSegmentChart'), {
+      type: 'doughnut',
+      data: {
+        labels: Object.keys(ranges),
+        datasets: [{ data: Object.values(ranges), backgroundColor: ['#4a5068', '#06b6d4', '#4f7ef8', '#a78bfa', '#22d3a5'], borderWidth: 1.5, borderColor: '#181c26' }]
+      },
+      options: { responsive: true, maintainAspectRatio: false, cutout: '65%' }
+    });
+
+    // Top 15 customer purchase distributions (horizontal bar)
+    let sortedCusts = Object.entries(customerAggregation).sort((a,b)=>b[1]-a[1]).slice(0, 10);
+    
+    if (customerDistChart) customerDistChart.destroy();
+    customerDistChart = new Chart(document.getElementById('customerDistChart'), {
+      type: 'bar',
+      data: {
+        labels: sortedCusts.map(c => c[0]),
+        datasets: [{
+          label: 'Total Revenue ($)',
+          data: sortedCusts.map(c => c[1]),
+          backgroundColor: '#06b6d4',
+          borderRadius: 4
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { display: false }, ticks: { color: '#8a92a8', font: { size: 9 } } },
+          y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#8a92a8', font: { size: 9 } } }
+        }
+      }
+    });
+  }
+}
+
+function updateCategoryChart() {
+  let fd = getFilteredData();
+  let type = document.getElementById('catType').value;
+  
+  let catMap = {};
+  fd.forEach(t => {
+    let val = type === 'revenue' ? t.revenue : t.units;
+    catMap[t.category] = (catMap[t.category] || 0) + val;
+  });
+
+  let labels = Object.keys(catMap);
+  let values = Object.values(catMap);
+  let colors = ['#4f7ef8', '#22d3a5', '#f5a623', '#a78bfa', '#06b6d4'];
+
+  if (catChart) catChart.destroy();
+  catChart = new Chart(document.getElementById('catChart'), {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [{ data: values, backgroundColor: colors, borderRadius: 5 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { display: false }, ticks: { color: '#8a92a8', font: { size: 10 } } },
+        y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#8a92a8', font: { size: 10 }, callback: v => type==='revenue' ? '$'+(v/1000).toFixed(0)+'K' : v } }
+      }
+    }
+  });
+}
+
+// ── AI Business Insights Engine ──────────────────────────────────────
+function generateExecutiveInsights(fd, stats, topCat, topCatPct) {
+  let textPanel = document.getElementById('insightsTextSummary');
+  let recsList = document.getElementById('recommendationsList');
+  
+  if (fd.length === 0) {
+    textPanel.innerHTML = 'Upload dataset to generate financial summaries.';
+    return;
+  }
+
+  // Calculate insights
+  let formattedRevenue = '$' + stats.rev.toLocaleString(undefined, {maximumFractionDigits: 0});
+  let formattedAOV = '$' + stats.aov.toFixed(2);
+  
+  // Find top product
+  let prodSummary = {};
+  fd.forEach(t => { prodSummary[t.product] = (prodSummary[t.product] || 0) + t.revenue; });
+  let topProduct = '-';
+  let topProductRev = 0;
+  for (let key in prodSummary) {
+    if (prodSummary[key] > topProductRev) {
+      topProduct = key;
+      topProductRev = prodSummary[key];
+    }
+  }
+  let topProductPct = stats.rev > 0 ? ((topProductRev / stats.rev) * 100).toFixed(1) : 0;
+
+  // Find lowest margin product category
+  let catMarginMap = {};
+  fd.forEach(t => {
+    if (!catMarginMap[t.category]) catMarginMap[t.category] = { rev: 0, sumMargin: 0 };
+    catMarginMap[t.category].rev += t.revenue;
+    catMarginMap[t.category].sumMargin += t.margin * t.revenue;
+  });
+  let lowestMarginCat = '-';
+  let lowestMarginVal = 100;
+  for (let [cat, data] of Object.entries(catMarginMap)) {
+    let avg = data.rev > 0 ? (data.sumMargin / data.rev) : 0;
+    if (avg < lowestMarginVal) {
+      lowestMarginVal = avg;
+      lowestMarginCat = cat;
+    }
+  }
+
+  textPanel.innerHTML = `
+    The financial reports show total gross revenues of <strong>${formattedRevenue}</strong> across 
+    <strong>${stats.sales.toLocaleString()} units</strong> sold. 
+    RevScope generated an Average Order Value (AOV) of <strong>${formattedAOV}</strong>, maintaining a healthy weighted profit margin of 
+    <strong>${stats.avgMargin.toFixed(1)}%</strong>. <br><br>
+    
+    The strongest product category this period is <strong>${topCat}</strong>, accounting for <strong>${topCatPct}%</strong> of total revenues. 
+    Individually, your lead revenue producer is the <strong>${topProduct}</strong>, contributing <strong>${topProductPct}%</strong> of all receipts.
+  `;
+
+  // Recommendations and warnings
+  recsList.innerHTML = '';
+  
+  // Anomaly 1: low margin warning
+  if (lowestMarginVal < 30) {
+    recsList.innerHTML += `
+      <div style="background: rgba(242,95,92,0.08); border: 1px solid rgba(242,95,92,0.2); padding: 12px; border-radius: 8px;">
+        <span style="color: var(--red); font-weight: 600; font-size: 12px;">⚠️ Profit Margin Risk Alert</span>
+        <div style="font-size: 12px; color: var(--text-2); margin-top: 4px;">
+          The <strong>${lowestMarginCat}</strong> category margin is currently running thin at <strong>${lowestMarginVal.toFixed(1)}%</strong>. Consider renegotiating supplier contracts or raising retail pricing by 10%.
+        </div>
+      </div>
+    `;
+  } else {
+    recsList.innerHTML += `
+      <div style="background: rgba(34,211,165,0.08); border: 1px solid rgba(34,211,165,0.2); padding: 12px; border-radius: 8px;">
+        <span style="color: var(--green); font-weight: 600; font-size: 12px;">✅ Margins Optimised</span>
+        <div style="font-size: 12px; color: var(--text-2); margin-top: 4px;">
+          All category gross profit margins exceed 30%. Financial health is currently stabilized.
+        </div>
+      </div>
+    `;
+  }
+
+  // Anomaly 2: volume growth driver
+  recsList.innerHTML += `
+    <div style="background: rgba(79,126,248,0.08); border: 1px solid rgba(79,126,248,0.2); padding: 12px; border-radius: 8px;">
+      <span style="color: var(--accent); font-weight: 600; font-size: 12px;">📈 Strategic Action Item</span>
+      <div style="font-size: 12px; color: var(--text-2); margin-top: 4px;">
+        Revenues are concentrated in <strong>${topProduct}</strong> (${topProductPct}%). Expand marketing resources towards secondary performers to diversify portfolio risk.
+      </div>
+    </div>
+  `;
+}
+
+// ── AI Chatbot Logic ────────────────────────────────────────────────
+function handleSendChat() {
+  let inp = document.getElementById('chatInput');
+  let text = inp.value.trim();
+  if (text) {
+    sendChat(text);
+    inp.value = '';
+  }
+}
+
+function sendChat(text) {
+  let msgs = document.getElementById('chatMessages');
+  msgs.innerHTML += `<div class="chat-message user">${text}</div>`;
+  msgs.scrollTop = msgs.scrollHeight;
+
+  setTimeout(() => {
+    // Analyze response client side based on keywords
+    let lower = text.toLowerCase();
+    let fd = getFilteredData();
+    let totalRev = fd.reduce((acc, t)=>acc+t.revenue, 0);
+
+    let reply = "";
+
+    if (lower.includes('customer')) {
+      // Find top customer
+      let custSummary = {};
+      fd.forEach(t => { custSummary[t.customer] = (custSummary[t.customer] || 0) + t.revenue; });
+      let topCust = '-';
+      let topCustSpend = 0;
+      for (let key in custSummary) {
+        if (custSummary[key] > topCustSpend) {
+          topCust = key;
+          topCustSpend = custSummary[key];
+        }
+      }
+      reply = `Our top purchasing customer is <strong>${topCust}</strong>, spending a total of <strong>$${topCustSpend.toLocaleString(undefined, {maximumFractionDigits: 0})}</strong> across the active period.`;
+    } 
+    else if (lower.includes('product') || lower.includes('highest selling')) {
+      let prodSummary = {};
+      fd.forEach(t => { prodSummary[t.product] = (prodSummary[t.product] || 0) + t.revenue; });
+      let topProd = '-';
+      let topProdRev = 0;
+      for (let key in prodSummary) {
+        if (prodSummary[key] > topProdRev) {
+          topProd = key;
+          topProdRev = prodSummary[key];
+        }
+      }
+      reply = `The highest revenue generating product is <strong>${topProd}</strong>, contributing <strong>$${topProdRev.toLocaleString(undefined, {maximumFractionDigits:0})}</strong> in sales receipts (representing approx <strong>${((topProdRev/totalRev)*100).toFixed(1)}%</strong> of total volume).`;
+    }
+    else if (lower.includes('q4') || lower.includes('summary') || lower.includes('performance')) {
+      let avgMargin = fd.reduce((acc, t)=>acc+(t.revenue*(t.margin/100)), 0);
+      let weightedMarg = totalRev > 0 ? (avgMargin/totalRev)*100 : 0;
+      reply = `<strong>Q4 Executive Summary:</strong><br>
+        • Total Gross Revenue: $${totalRev.toLocaleString(undefined, {maximumFractionDigits: 0})}<br>
+        • Sales Transactions: ${fd.length} line orders<br>
+        • Weighted Gross Margin: ${weightedMarg.toFixed(1)}%<br>
+        • Active Customers: ${new Set(fd.map(t=>t.customer)).size} unique buyers.`;
+    }
+    else if (lower.includes('region') || lower.includes('margin')) {
+      // Find lowest margin region
+      let regMarginMap = {};
+      fd.forEach(t => {
+        if (!regMarginMap[t.region]) regMarginMap[t.region] = { rev: 0, sumMargin: 0 };
+        regMarginMap[t.region].rev += t.revenue;
+        regMarginMap[t.region].sumMargin += t.margin * t.revenue;
+      });
+      let lowestReg = '-';
+      let lowestVal = 100;
+      for (let [reg, data] of Object.entries(regMarginMap)) {
+        let avg = data.rev > 0 ? (data.sumMargin / data.rev) : 0;
+        if (avg < lowestVal) {
+          lowestVal = avg;
+          lowestReg = reg;
+        }
+      }
+      reply = `The lowest operating gross profit margin is in the <strong>${lowestReg} Region</strong>, averaging <strong>${lowestVal.toFixed(1)}%</strong>. Consider auditing logistic routes or regional vendor supply pricing.`;
+    }
+    else {
+      reply = `I processed your request against the active dataset (${activeDatasetName}). Currently, total receipts sum to $${totalRev.toLocaleString(undefined, {maximumFractionDigits:0})} across ${fd.length} orders. Ask me specifically about "top customer", "top products", "lowest margins", or "summary" for detailed reports.`;
+    }
+
+    msgs.innerHTML += `<div class="chat-message ai">${reply}</div>`;
+    msgs.scrollTop = msgs.scrollHeight;
+  }, 600);
+}
+
+// ── Database Connection Simulators ──────────────────────────────────
+function selectDatabase(dbId) {
+  activeDb = dbId;
+  for (let key in dbConnections) {
+    let cardBadge = document.getElementById(`badge-${key}`);
+    if (key === dbId) {
+      dbConnections[key].status = 'connected';
+      cardBadge.textContent = 'Connected';
+      cardBadge.className = 'int-badge connected';
+    } else {
+      dbConnections[key].status = 'idle';
+      cardBadge.textContent = 'Idle';
+      cardBadge.className = 'int-badge idle';
+    }
+  }
+  
+  let terminal = document.getElementById('dbTerminal');
+  terminal.innerHTML += `<br><span class="log-success">» Switch database environment to: ${dbConnections[dbId].name} (${dbConnections[dbId].host})</span>`;
+  terminal.scrollTop = terminal.scrollHeight;
+  
+  // Set active preset query depending on DB
+  if (dbId === 'pg') {
+    activeDatasetName = "PostgreSQL Tech Store Q4";
+    rawTransactions = generateMockData('tech');
+  } else if (dbId === 'mysql') {
+    activeDatasetName = "MySQL Apparel & Fashion";
+    rawTransactions = generateMockData('fashion');
+  } else if (dbId === 'salesforce') {
+    activeDatasetName = "Salesforce Enterprise SaaS";
+    rawTransactions = generateMockData('saas');
+  }
+  
+  updateFilterDropdownOptions();
+  updateDashboard();
+  showToast(`Successfully connected to ${dbConnections[dbId].name}`);
+}
+
+function pastePresetSql(val) {
+  if (val) {
+    document.getElementById('sqlQueryText').value = val;
+  }
+}
+
+function testDbConnection() {
+  let terminal = document.getElementById('dbTerminal');
+  terminal.innerHTML += `<br>» Pinging database endpoint [${dbConnections[activeDb].host}]...`;
+  setTimeout(() => {
+    terminal.innerHTML += `<br><span class="log-success">» PING 200 SUCCESS - Latency: 14ms. SSL Certificate Valid.</span>`;
+    terminal.scrollTop = terminal.scrollHeight;
+  }, 300);
+}
+
+function executeSqlSim() {
+  let query = document.getElementById('sqlQueryText').value;
+  let terminal = document.getElementById('dbTerminal');
+  terminal.innerHTML += `<br>» Executing: <span style="color:#f5a623">${query}</span>`;
+  
+  setTimeout(() => {
+    // Generate filtered sub-datasets based on parsed query terms
+    let fd = [...rawTransactions];
+    let queryLower = query.toLowerCase();
+    
+    if (queryLower.includes("where category")) {
+      // Find category in query
+      let matches = query.match(/'([^']+)'/);
+      if (matches && matches[1]) {
+        let cat = matches[1];
+        fd = fd.filter(t => t.category.toLowerCase() === cat.toLowerCase());
+      }
+    }
+    if (queryLower.includes("where region")) {
+      let matches = query.match(/'([^']+)'/);
+      if (matches && matches[1]) {
+        let reg = matches[1];
+        fd = fd.filter(t => t.region.toLowerCase() === reg.toLowerCase());
+      }
+    }
+    if (queryLower.includes("where margin >")) {
+      let val = parseInt(queryLower.split("where margin >")[1]) || 50;
+      fd = fd.filter(t => t.margin > val);
+    }
+    
+    terminal.innerHTML += `<br><span class="log-success">» Success: ${fd.length} rows returned. Loading query output in dashboard view...</span>`;
+    terminal.scrollTop = terminal.scrollHeight;
+    
+    // Feed this directly to tables & charts
+    renderProductsTable(fd, fd.slice(0, Math.floor(fd.length/2)));
+    renderActivityFeed(fd);
+    showToast(`SQL Executed. Loaded ${fd.length} query records.`);
+  }, 400);
+}
+
+// ── File Parsing & Columns Mapping Wizard ───────────────────────────
+function openImportModal() {
+  document.getElementById('importModal').classList.add('open');
+  setImportTab('file');
+}
+
+function closeImportModal() {
+  document.getElementById('importModal').classList.remove('open');
+}
+
+function setImportTab(tabId) {
+  document.querySelectorAll('.modal-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById(`tab-${tabId}`).classList.add('active');
+  
+  document.querySelectorAll('.import-body-section').forEach(b => b.style.display = 'none');
+  document.getElementById(`body-${tabId}`).style.display = 'block';
+
+  let footerBtn = document.getElementById('modalApplyBtn');
+  if (tabId === 'mapping') {
+    footerBtn.style.display = 'block';
+  } else {
+    footerBtn.style.display = 'none';
+  }
+}
+
+// Preset datasets inside the modal loader
+function loadSamplePreset(type) {
+  closeImportModal();
+  let name = "";
+  if (type === 'tech') name = "Electronics Store Q4";
+  else if (type === 'fashion') name = "Global Apparel & Fashion";
+  else if (type === 'grocery') name = "Organic Fresh Grocery Mart";
+  else if (type === 'saas') name = "Enterprise SaaS Platform";
+  
+  activeDatasetName = name;
+  rawTransactions = generateMockData(type);
+  
+  updateFilterDropdownOptions();
+  updateDashboard();
+  showToast(`Sample dataset "${name}" loaded.`);
+}
+
+// PapaParse CSV & XLSX File Reader
+function handleModalFileSelect(e) {
+  let file = e.target.files[0];
+  if (!file) return;
+  parseUploadedFile(file);
+}
+
+// Drag & drop support
+let dropZone = document.getElementById('dropZone');
+dropZone.addEventListener('dragover', e => {
+  e.preventDefault();
+  dropZone.classList.add('dragover');
+});
+dropZone.addEventListener('dragleave', () => {
+  dropZone.classList.remove('dragover');
+});
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('dragover');
+  let file = e.dataTransfer.files[0];
+  if (file) parseUploadedFile(file);
+});
+
+function parseUploadedFile(file) {
+  let statusEl = document.getElementById('fileUploadStatus');
+  statusEl.textContent = `Reading ${file.name}...`;
+
+  let ext = file.name.split('.').pop().toLowerCase();
+  
+  if (ext === 'csv') {
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      dynamicTyping: true,
+      complete: results => {
+        processUploadedRows(results.data, file.name);
+      },
+      error: err => {
+        statusEl.textContent = `Error: ${err.message}`;
+      }
+    });
+  } else if (ext === 'xlsx' || ext === 'xls') {
+    let reader = new FileReader();
+    reader.onload = e => {
+      let data = new Uint8Array(e.target.result);
+      let workbook = XLSX.read(data, {type: 'array'});
+      let firstSheet = workbook.SheetNames[0];
+      let sheetData = XLSX.utils.sheet_to_json(workbook.Sheets[firstSheet], {defval: ""});
+      processUploadedRows(sheetData, file.name);
+    };
+    reader.readAsArrayBuffer(file);
+  } else {
+    statusEl.textContent = "Unsupported file type. Use .csv or .xlsx";
+  }
+}
+
+function processUploadedRows(rows, filename) {
+  if (rows.length === 0) {
+    document.getElementById('fileUploadStatus').textContent = "Empty file.";
+    return;
+  }
+  
+  tempParsedRows = rows;
+  tempParsedHeaders = Object.keys(rows[0]);
+  
+  document.getElementById('fileUploadStatus').innerHTML = `Parsed <strong>${rows.length}</strong> records.`;
+  showColumnSchemaMapper(filename);
+}
+
+function showColumnSchemaMapper(filename) {
+  let fieldsContainer = document.getElementById('mappingFieldsContainer');
+  fieldsContainer.innerHTML = '';
+  
+  // List of standard internal system fields we require
+  let fields = [
+    { key: 'date', label: 'Transaction Date (Required)', patterns: ['date', 'time', 'day', 'created'] },
+    { key: 'product', label: 'Product Name (Required)', patterns: ['prod', 'item', 'name', 'title'] },
+    { key: 'category', label: 'Category', patterns: ['cat', 'type', 'group', 'class'] },
+    { key: 'units', label: 'Units Sold (Qty)', patterns: ['unit', 'qty', 'quantity', 'count'] },
+    { key: 'revenue', label: 'Revenue / Total Amount (Required)', patterns: ['rev', 'amount', 'sales', 'price', 'total'] },
+    { key: 'margin', label: 'Gross Margin %', patterns: ['margin', 'profit', 'percent', 'cost'] },
+    { key: 'region', label: 'Sales Region', patterns: ['region', 'loc', 'area', 'country', 'city'] },
+    { key: 'customer', label: 'Customer Name', patterns: ['cust', 'client', 'company', 'buyer'] }
+  ];
+
+  fields.forEach(field => {
+    // Attempt auto-detection based on header strings
+    let detected = "";
+    for (let header of tempParsedHeaders) {
+      let hLower = header.toLowerCase();
+      if (field.patterns.some(p => hLower.includes(p))) {
+        detected = header;
+        break;
+      }
+    }
+    
+    let options = tempParsedHeaders.map(h => `<option value="${h}" ${h === detected ? 'selected' : ''}>${h}</option>`).join('');
+    // Add default fallbacks
+    options = `<option value="">-- Set Default Constant --</option>` + options;
+
+    fieldsContainer.innerHTML += `
+      <div class="mapping-row">
+        <span class="mapping-label">${field.label}</span>
+        <select id="map-${field.key}" class="filter-select" style="width: 250px;">
+          ${options}
+        </select>
+      </div>
+    `;
+  });
+
+  // Enable Mapping Tab
+  let mapTab = document.getElementById('tab-mapping');
+  mapTab.style.display = 'block';
+  setImportTab('mapping');
+}
+
+function applyColumnMapping() {
+  let mapDate = document.getElementById('map-date').value;
+  let mapProd = document.getElementById('map-product').value;
+  let mapCat = document.getElementById('map-category').value;
+  let mapUnits = document.getElementById('map-units').value;
+  let mapRev = document.getElementById('map-revenue').value;
+  let mapMargin = document.getElementById('map-margin').value;
+  let mapRegion = document.getElementById('map-region').value;
+  let mapCust = document.getElementById('map-customer').value;
+
+  if (!mapDate || !mapProd || !mapRev) {
+    alert("Please map the required fields: Date, Product Name, and Revenue.");
+    return;
+  }
+
+  let finalData = tempParsedRows.map(row => {
+    let dateStr = row[mapDate] ? String(row[mapDate]) : '2026-10-01';
+    // Format date string to YYYY-MM-DD
+    if (dateStr.includes('T')) dateStr = dateStr.split('T')[0];
+    
+    let revVal = parseFloat(String(row[mapRev]).replace(/[^0-9.-]+/g,"")) || 0;
+    let unitsVal = mapUnits ? (parseInt(row[mapUnits]) || 1) : 1;
+    let marginVal = mapMargin ? (parseFloat(row[mapMargin]) || 45) : 45;
+    // Normalize margin to percentage (e.g. 0.45 -> 45)
+    if (marginVal > 0 && marginVal < 1) marginVal *= 100;
+
+    return {
+      date: dateStr,
+      product: row[mapProd] ? String(row[mapProd]) : 'Standard SKU',
+      category: mapCat ? (row[mapCat] ? String(row[mapCat]) : 'General') : 'General',
+      units: unitsVal,
+      revenue: revVal,
+      margin: marginVal,
+      region: mapRegion ? (row[mapRegion] ? String(row[mapRegion]) : 'Global') : 'Global',
+      customer: mapCust ? (row[mapCust] ? String(row[mapCust]) : 'Direct Consumer') : 'Direct Consumer',
+      col: '#4f7ef8'
+    };
+  });
+
+  activeDatasetName = "Uploaded Custom File";
+  rawTransactions = finalData;
+  
+  // Hide mapping tab, close modal, recalculate dashboard
+  document.getElementById('tab-mapping').style.display = 'none';
+  closeImportModal();
+  updateFilterDropdownOptions();
+  updateDashboard();
+  showToast(`Successfully imported ${finalData.length} records.`);
+}
+
+// ── Database Connection Modal Simulator ─────────────────────────────
+function testModalDbConnection() {
+  let terminal = document.getElementById('dbModalTerminal');
+  let type = document.getElementById('dbModalType').value;
+  let host = document.getElementById('dbModalHost').value;
+  
+  terminal.innerHTML = `» Connecting to simulated ${type} on [${host}]...`;
+  setTimeout(() => {
+    terminal.innerHTML += `<br><span class="log-success">» Connection OK. Credentials authenticated. SSL active.</span>`;
+  }, 800);
+}
+
+function importFromModalDb() {
+  let terminal = document.getElementById('dbModalTerminal');
+  let type = document.getElementById('dbModalType').value;
+  
+  terminal.innerHTML += `<br>» Initiating bulk fetch of sales metrics...`;
+  setTimeout(() => {
+    closeImportModal();
+    activeDatasetName = `Database [${type.toUpperCase()}] Import`;
+    rawTransactions = generateMockData('tech'); // PostgreSQL Tech default
+    updateFilterDropdownOptions();
+    updateDashboard();
+    showToast(`Simulated Database Import complete.`);
+  }, 1200);
+}
+
+// ── Data Export Utility ──────────────────────────────────────────────
+function exportReport() {
+  let fd = getFilteredData();
+  if (fd.length === 0) {
+    showToast("No data available to export.");
+    return;
+  }
+  
+  let csv = "Date,Product,Category,Units,Revenue ($),Gross Margin (%),Region,Customer\n";
+  fd.forEach(t => {
+    csv += `${t.date},"${t.product.replace(/"/g, '""')}","${t.category.replace(/"/g, '""')}",${t.units},${t.revenue},${t.margin},"${t.region.replace(/"/g, '""')}","${t.customer.replace(/"/g, '""')}"\n`;
+  });
+  
+  let blob = new Blob([csv], { type: 'text/csv' });
+  let a = Object.assign(document.createElement('a'), {
+    href: URL.createObjectURL(blob),
+    download: `revscope-${activeDatasetName.replace(/\s+/g, '-').toLowerCase()}-export.csv`
+  });
+  a.click();
+  showToast("CSV report downloaded.");
+}
+
+function showToast(msg) {
+  let t = document.getElementById('toast');
+  document.getElementById('toastMsg').textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// Mobile responsive menus
+if (window.innerWidth <= 860) document.getElementById('menuBtn').style.display = 'flex';
+window.addEventListener('resize', () => {
+  document.getElementById('menuBtn').style.display = window.innerWidth <= 860 ? 'flex' : 'none';
+});
+
+// Initialize with Tech Q4 default dataset
+rawTransactions = generateMockData('tech');
+updateFilterDropdownOptions();
+updateDashboard();
+</script>
+</body>
+</html>
